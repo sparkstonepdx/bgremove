@@ -372,12 +372,17 @@ $('done').addEventListener('click', () => {
 // ---------------------------------------------------------------- boot
 
 let fellBack = false;
+// overridden by config.json, which names the file the server actually wrote
+let fallbackURL = './model.onnx';
 
 status.textContent = 'Loading model';
 fetch('./config.json')
   .then((r) => (r.ok ? r.json() : { model: undefined }))
   .catch(() => ({ model: undefined }))
-  .then((cfg) => loadProfiles('./profiles.json', cfg.model))
+  .then((cfg) => {
+    fallbackURL = cfg.fallback || fallbackURL;
+    return loadProfiles('./profiles.json', cfg.model);
+  })
   .then((p) => {
     defaults = {
       clean: { ...profile.clean },
@@ -390,7 +395,7 @@ fetch('./config.json')
     $('letterbox').checked = profile.letterbox;
     readouts();
     status.textContent = `Loading model (${Math.round(p.bytes / (1 << 20))} MB)`;
-    return sessionWithFallback('./model.onnx', './u2netp.onnx', 'u2netp');
+    return sessionWithFallback('./model.onnx', fallbackURL, 'u2netp');
   })
   .then((result) => {
     if (result.fellBack) {

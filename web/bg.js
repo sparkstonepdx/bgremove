@@ -55,7 +55,9 @@ export function threadCount() {
   return Math.min(4, globalThis.navigator?.hardwareConcurrency || 2);
 }
 
-export async function getSession(model = './u2netp.onnx') {
+// No default: the caller knows which file the server wrote. A default here
+// was a second place that named a model file, and it went stale.
+export async function getSession(model) {
   if (session) return session;
   ort.env.wasm.numThreads = threadCount();
   session = await ort.InferenceSession.create(model, {

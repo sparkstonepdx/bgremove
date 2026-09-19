@@ -223,6 +223,11 @@
   </div>
 </aside>
 
+<!-- Only does anything on a host that cannot set COOP and COEP itself, such
+     as GitHub Pages: it registers a service worker that adds them, which is
+     what unlocks SharedArrayBuffer and therefore threads. Harmless when the
+     headers are already present. -->
+<script src="./coi-serviceworker.min.js"></script>
 <script type="importmap">
 { "imports": { "onnxruntime-web": "./ort.wasm.min.mjs" } }
 </script>

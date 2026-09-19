@@ -35,6 +35,14 @@ var content embed.FS
 //go:embed node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm
 var runtime embed.FS
 
+// A static host cannot set COOP and COEP, so a site exported with -dir has no
+// way to reach cross-origin isolation and would run single-threaded. This
+// service worker installs itself and adds those headers to every response,
+// which is the standard way around it on GitHub Pages.
+//
+//go:embed node_modules/coi-serviceworker/coi-serviceworker.min.js
+var isolationShim []byte
+
 var runtimeFiles = []string{
 	"ort.wasm.min.mjs",
 	"ort-wasm-simd-threaded.mjs",
@@ -143,26 +151,53 @@ func main() {
 		if err := export(site, *dir); err != nil {
 			log.Fatal(err)
 		}
+		write := func(name string, data []byte) {
+			if err := os.WriteFile(filepath.Join(*dir, name), data, 0o644); err != nil {
+				log.Fatal(err)
+			}
+		}
 		for _, name := range runtimeFiles {
 			data, err := runtime.ReadFile("node_modules/onnxruntime-web/dist/" + name)
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(*dir, name), data, 0o644); err != nil {
-				log.Fatal(err)
-			}
+			write(name, data)
 		}
-		if modelPath != "" {
-			data, err := os.ReadFile(modelPath)
+		// Without this the page falls back to whatever profiles.json calls
+		// default, which need not be the model that was exported: the wrong
+		// normalisation on the right weights returns a blank mask.
+		// The page falls back to a smaller model if the browser refuses this
+		// one; name the file rather than assuming, so exporting u2netp does
+		// not have to ship a second copy of itself.
+		fallbackURL := "./u2netp.onnx"
+		if *model == "u2netp" {
+			fallbackURL = "./model.onnx"
+		}
+		cfg, err := json.Marshal(map[string]string{
+			"model":    *model,
+			"fallback": fallbackURL,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		write("config.json", cfg)
+		write("coi-serviceworker.min.js", isolationShim)
+
+		data, err := os.ReadFile(modelPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		write("model.onnx", data)
+		if *model != "u2netp" {
+			small, err := os.ReadFile(fallbackPath)
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(*dir, "model.onnx"), data, 0o644); err != nil {
-				log.Fatal(err)
-			}
+			write("u2netp.onnx", small)
 		}
+
 		log.Printf("wrote the site to %s", *dir)
-		log.Printf("serve it with the two COOP/COEP headers set, or it will run single-threaded")
+		log.Printf("serving %s; any static host will do, the service worker handles isolation", *model)
 		return
 	}
 
@@ -195,6 +230,10 @@ func main() {
 		})
 	}
 
+	mux.HandleFunc("/coi-serviceworker.min.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/javascript")
+		w.Write(isolationShim)
+	})
 	mux.Handle("/", http.FileServer(http.FS(site)))
 
 	log.Printf("bgremove at http://%s  serving %s  (ctrl-c to stop)", *addr, *model)

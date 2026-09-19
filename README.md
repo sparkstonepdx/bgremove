@@ -18,6 +18,34 @@ mask IoU against 92.7% on the test fixture.
 
 23 MB binary: 12 MB runtime, 4.5 MB model, the rest Go.
 
+## Hosting it as a static site
+
+```
+./bgremove -model u2netp -dir site/
+```
+
+That writes a self-contained directory: the page, the runtime, the model, a
+`config.json` naming which model was written, and a service worker. Any static
+host will serve it, GitHub Pages included. There is no server-side anything.
+
+Two constraints worth knowing before you push it.
+
+**Headers.** A static host cannot set `Cross-Origin-Opener-Policy` and
+`Cross-Origin-Embedder-Policy`, which is what unlocks SharedArrayBuffer and
+therefore threads. The export ships `coi-serviceworker`, a service worker that
+adds those headers to every response and reloads once on first visit, which is
+the usual way around this on Pages. On a host that sets the headers itself it
+does nothing.
+
+**Model size.** GitHub rejects files over 100 MB, so u2netp at 4.5 MB is fine
+and isnet at 178 MB cannot go in the repo. Fetching it at runtime from the
+rembg release does not work either: those assets carry no
+`Access-Control-Allow-Origin`, so the browser blocks it cross-origin. To ship
+isnet on Pages you need it on a host that sets CORS, or split across files
+under the limit and reassembled in the page.
+
+The whole site with u2netp is about 16 MB, most of it the 12 MB runtime.
+
 ## Why the server exists at all
 
 Only to set `Cross-Origin-Opener-Policy: same-origin` and
