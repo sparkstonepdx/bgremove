@@ -3,10 +3,21 @@
 // same code the page loads.
 import { createCanvas, ImageData as NapiImageData, loadImage } from '@napi-rs/canvas';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+
+// Models live in the user cache, put there by either build on first run.
+function modelPath(name) {
+  const cached = path.join(os.homedir(), '.cache', 'bgremove', `${name}.onnx`);
+  if (!fs.existsSync(cached)) {
+    console.log(`no ${name}.onnx in ~/.cache/bgremove; run either build once to fetch it`);
+    process.exit(0);
+  }
+  return cached;
+}
 
 class OffscreenCanvasShim {
   constructor(width, height) {
@@ -60,7 +71,7 @@ function alphaOf(png) {
 }
 
 // the browser passes a relative URL; Node needs the bytes
-const model = new Uint8Array(fs.readFileSync(path.join(here, '..', 'web', 'u2netp.onnx')));
+const model = new Uint8Array(fs.readFileSync(modelPath('u2netp')));
 // this harness runs against the embedded u2netp file, so pin that profile
 // rather than following the table's default, which may be a larger model
 await bg.loadProfiles(JSON.parse(fs.readFileSync(path.join(here, '..', 'web', 'profiles.json'), 'utf8')), 'u2netp');

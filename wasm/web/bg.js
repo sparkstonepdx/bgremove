@@ -1,6 +1,9 @@
 // The image pipeline, with no DOM in it, so a harness can run it outside a
 // browser. app.js holds the event wiring.
-import * as ort from './ort.wasm.min.mjs';
+// Bare specifier on purpose: Node resolves it from node_modules, and the
+// browser resolves it through the import map in index.html. Neither one
+// hardcodes a path into this file.
+import * as ort from 'onnxruntime-web';
 
 // Model settings come from profiles.json, which the native build embeds
 // byte-for-byte. Nothing about a model is hardcoded here; harness/parity.mjs

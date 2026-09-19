@@ -1,0 +1,9 @@
+{
+  "name": "bgremove-wasm",
+  "private": true,
+  "description": "The ONNX Runtime build the page loads. Declared here so a package manager owns it instead of a fetch script; the Go binary embeds it from node_modules at build time.",
+  "dependencies": {
+    "onnxruntime-web": "1.23.0"
+  },
+  "type": "module"
+}
