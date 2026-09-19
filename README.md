@@ -100,6 +100,13 @@ it from swallowing the frame on a low-contrast subject:
   stroke cannot cross from subject into confident background.
 - A radius of a quarter of the input, which bounds a runaway fill.
 
+Growth spreads breadth-first from the seed, and the radius cap is counted in
+steps taken rather than straight-line distance to the nearest seed pixel.
+That keeps the cost linear in the image: measuring against every seed pixel
+made it quadratic in brush area, and one wide stroke at 1024 locked the page
+up for 15 seconds. Steps are the better measure anyway, since growth cannot
+reach around a barrier it never crossed.
+
 Growing works on the scaled input the model saw, not the full-resolution
 photo, so it follows edges at the model's own resolution. Strokes themselves
 are stored as normalised points rather than pixels and rasterised into the

@@ -249,6 +249,24 @@ check('radius bounds it even at high tolerance', area(penned) < area(grown),
 check('the prediction carries its scaled pixels for growing',
   pred.rgb?.length === pred.size * pred.size * 4, String(pred.rgb?.length));
 
+// Growing has to stay linear in the image, not quadratic in brush area. The
+// radius cap used to be measured against every seed pixel, which locked the
+// page up for 15 seconds on one wide stroke at 1024.
+const drag = [];
+for (let k = 0; k <= 40; k++) drag.push({ x: 0.2 + k * 0.015, y: 0.3 + Math.sin(k / 5) * 0.1 });
+const timed = (size) => {
+  const at = Date.now();
+  bg.compose(bitmap, pred, {
+    strokes: [{ mode: 'cut', size, grow: { tolerance: 0.15, radius: 0.25 }, points: drag }],
+    protect: 0,
+  });
+  return Date.now() - at;
+};
+const small = timed(0.05);
+const huge = timed(0.8);
+check('a wide dragged stroke does not blow up', huge < small * 8 + 500,
+  `${small}ms at 0.05 vs ${huge}ms at 0.8`);
+
 // 9. the click simulator itself, since the benchmark's numbers rest on it
 const sim = await import(path.join(here, 'clicksim.mjs'));
 

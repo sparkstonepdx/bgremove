@@ -142,7 +142,7 @@ export function grow(pred, seedMask, { tolerance = 0.12, radius = 0.25 } = {}) {
   if (!rgb) return seedMask;
 
   const n = SIZE * SIZE;
-  const limit = radius * SIZE;
+  const limit = Math.round(radius * SIZE);
   const tol = tolerance * 255;
 
   // average colour and prediction under the seed
@@ -151,7 +151,10 @@ export function grow(pred, seedMask, { tolerance = 0.12, radius = 0.25 } = {}) {
   let sb = 0;
   let sp = 0;
   let count = 0;
-  const frontier = [];
+  const out = Uint8Array.from(seedMask);
+  const queue = new Int32Array(n);
+  const depth = new Int32Array(n);
+  let tail = 0;
   for (let i = 0; i < n; i++) {
     if (!seedMask[i]) continue;
     sr += rgb[i * 4];
@@ -159,7 +162,7 @@ export function grow(pred, seedMask, { tolerance = 0.12, radius = 0.25 } = {}) {
     sb += rgb[i * 4 + 2];
     sp += pred.data[i];
     count++;
-    frontier.push(i);
+    queue[tail++] = i;
   }
   if (!count) return seedMask;
   sr /= count;
@@ -167,39 +170,30 @@ export function grow(pred, seedMask, { tolerance = 0.12, radius = 0.25 } = {}) {
   sb /= count;
   sp /= count;
 
-  const seeds = frontier.slice();
-  const out = Uint8Array.from(seedMask);
-  const stack = frontier;
+  // Breadth first, carrying how many steps each pixel is from the seed, so
+  // the radius cap costs nothing. Measuring the cap as distance to the
+  // nearest seed pixel instead meant scanning every seed for every candidate,
+  // which is quadratic in brush area: a wide stroke at 1024 took 15 seconds
+  // and locked up the page. Steps also beat straight-line distance here,
+  // since growth cannot reach around a barrier it never crossed.
+  for (let head = 0; head < tail; head++) {
+    const i = queue[head];
+    const d = depth[i];
+    if (d >= limit) continue;
 
-  const near = (i) => {
-    let best = Infinity;
     const x = i % SIZE;
-    const y = (i - x) / SIZE;
-    for (const s of seeds) {
-      const sx = s % SIZE;
-      const sy = (s - sx) / SIZE;
-      const d = Math.hypot(x - sx, y - sy);
-      if (d < best) best = d;
-      if (best <= limit) return true;
-    }
-    return best <= limit;
-  };
+    const consider = (j) => {
+      if (out[j]) return;
+      const dr = rgb[j * 4] - sr;
+      const dg = rgb[j * 4 + 1] - sg;
+      const db = rgb[j * 4 + 2] - sb;
+      if (Math.sqrt(dr * dr + dg * dg + db * db) > tol) return;
+      if (Math.abs(pred.data[j] - sp) > 0.5) return;
+      out[j] = 1;
+      depth[j] = d + 1;
+      queue[tail++] = j;
+    };
 
-  const consider = (i) => {
-    if (out[i]) return;
-    const dr = rgb[i * 4] - sr;
-    const dg = rgb[i * 4 + 1] - sg;
-    const db = rgb[i * 4 + 2] - sb;
-    if (Math.sqrt(dr * dr + dg * dg + db * db) > tol) return;
-    if (Math.abs(pred.data[i] - sp) > 0.5) return;
-    if (!near(i)) return;
-    out[i] = 1;
-    stack.push(i);
-  };
-
-  while (stack.length) {
-    const i = stack.pop();
-    const x = i % SIZE;
     if (x > 0) consider(i - 1);
     if (x < SIZE - 1) consider(i + 1);
     if (i >= SIZE) consider(i - SIZE);
