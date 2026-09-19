@@ -1,0 +1,21 @@
+{
+  "name": "bgremove-harness",
+  "version": "1.0.0",
+  "description": "Runs web/bg.js and web/app.js outside a browser",
+  "main": "index.js",
+  "scripts": {
+    "test": "node run.mjs && node dom.mjs && node fallback.mjs",
+    "quality": "node quality.mjs",
+    "clicks": "node clicks.mjs",
+    "check": "npm test && npm run quality"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.9",
+    "linkedom": "^0.18.13"
+  },
+  "private": true,
+  "type": "module"
+}
