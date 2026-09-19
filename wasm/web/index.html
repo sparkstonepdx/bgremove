@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>bgremove</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #e8e6e1;
+    --dim: #8a867e;
+    --edge: #2e2c29;
+    --panel: #1a1917;
+    --live: #7fd1b9;
+    --keep: #43d17a;
+    --cut: #e8564a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: #121110; color: var(--ink);
+    font: 15px/1.5 ui-sans-serif, system-ui, sans-serif;
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr) 290px;
+    grid-template-rows: 100%;
+    /* dvh so mobile browser chrome sliding in and out does not crop the
+       bottom of the layout, with vh for anything that lacks it */
+    height: 100vh;
+    height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* finished work, left */
+  #rail { border-right: 1px solid var(--edge); display: flex; flex-direction: column;
+    min-height: 0; background: var(--panel); }
+  #rail h2, #panel h2 { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--dim); margin: 0; padding: 1rem 1rem .5rem; font-weight: 600; }
+  #finished { list-style: none; margin: 0; padding: 0 .75rem 1rem; overflow-y: auto; flex: 1;
+    display: flex; flex-direction: column; gap: .5rem; min-height: 0; }
+  #finished li { border: 1px solid var(--edge); border-radius: 8px; overflow: hidden;
+    cursor: pointer; background: #121110; }
+  #finished li:hover { border-color: var(--live); }
+  #finished .thumb { aspect-ratio: 1; display: grid; place-items: center; padding: .4rem;
+    background-image:
+      linear-gradient(45deg, #232220 25%, transparent 25%, transparent 75%, #232220 75%),
+      linear-gradient(45deg, #232220 25%, #1a1917 25%, #1a1917 75%, #232220 75%);
+    background-size: 14px 14px; background-position: 0 0, 7px 7px; }
+  #finished .thumb img { max-width: 100%; max-height: 100%; }
+  #finished .label { padding: .35rem .5rem; font-size: .7rem; color: var(--dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #railempty { padding: 0 1rem; color: var(--dim); font-size: .8125rem; }
+
+  /* the image under edit, centre */
+  #centre { display: grid; grid-template-rows: 1fr auto; min-height: 0; min-width: 0; }
+  #stagewrap { display: grid; place-items: center; padding: 1.5rem; min-height: 0; min-width: 0; }
+  #stage { position: relative; max-width: 100%; max-height: 100%; display: none;
+    background-image:
+      linear-gradient(45deg, #232220 25%, transparent 25%, transparent 75%, #232220 75%),
+      linear-gradient(45deg, #232220 25%, #1a1917 25%, #1a1917 75%, #232220 75%);
+    background-size: 22px 22px; background-position: 0 0, 11px 11px;
+    border-radius: 6px; overflow: hidden; }
+  body.editing #stage { display: block; }
+  #stage img { display: block; width: 100%; height: 100%; }
+  #paint { position: absolute; inset: 0; width: 100%; height: 100%;
+    /* only swallow touch gestures while a brush is selected; otherwise the
+       page cannot be scrolled or pinched on a phone */
+    touch-action: auto; }
+  body.brushing #paint { cursor: crosshair; touch-action: none; }
+  #stage { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+  #stage.busy img { opacity: .4; }
+
+  #drop { border: 1px dashed var(--edge); border-radius: 12px; padding: 4rem 3rem;
+    text-align: center; color: var(--dim); cursor: pointer; max-width: 30rem; }
+  #drop:hover, #drop.over { border-color: var(--live); color: var(--ink); }
+  .touch-only { display: none; }
+  @media (hover: none) {
+    .pointer-only { display: none; }
+    .touch-only { display: inline; }
+  }
+  #drop.over { border-style: solid; }
+  body.editing #drop { display: none; }
+
+  footer { border-top: 1px solid var(--edge); padding: .6rem 1.5rem; color: var(--dim);
+    font-size: .8125rem; display: flex; justify-content: space-between; gap: 1rem; }
+  #queue { color: var(--live); }
+
+  /* tools, right */
+  #panel { border-left: 1px solid var(--edge); background: var(--panel);
+    overflow-y: auto; display: flex; flex-direction: column; }
+  #panel .group { padding: 0 1rem 1rem; display: flex; flex-direction: column; gap: .6rem; }
+  body:not(.editing) #panel .group { opacity: .35; pointer-events: none; }
+  label { display: flex; align-items: center; gap: .5rem; font-size: .8125rem; color: var(--dim); }
+  label.wide { flex-direction: column; align-items: stretch; gap: .25rem; }
+  .row { display: flex; align-items: center; gap: .5rem; }
+  input[type=range] { flex: 1; min-width: 0; accent-color: var(--live); }
+  output { font-variant-numeric: tabular-nums; min-width: 2.4rem; text-align: right; color: var(--ink); }
+  button, input[type=color] { background: #121110; color: var(--ink); border: 1px solid var(--edge);
+    border-radius: 6px; padding: .4rem .6rem; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--live); }
+  button.primary { background: var(--live); color: #0d1714; border-color: var(--live); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  .tools-row { display: flex; gap: .35rem; }
+  .tools-row label { flex: 1; justify-content: center; border: 1px solid var(--edge);
+    border-radius: 6px; padding: .4rem .3rem; cursor: pointer; }
+  .tools-row input { position: absolute; opacity: 0; pointer-events: none; }
+  .tools-row label:has(input:checked) { border-color: var(--live); color: var(--ink); }
+  .swatch { width: .65rem; height: .65rem; border-radius: 2px; }
+  .swatch.keep { background: var(--keep); }
+  .swatch.cut { background: var(--cut); }
+  .actions { display: flex; gap: .5rem; }
+  .actions > * { flex: 1; }
+  a.save { display: block; text-align: center; text-decoration: none; }
+  hr { border: none; border-top: 1px solid var(--edge); margin: 0 1rem; }
+  :focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+
+  #tabs { display: none; }
+  #tabs button { flex: 1; border: none; border-bottom: 1px solid var(--edge);
+    border-radius: 0; padding: .7rem .3rem; color: var(--dim); background: transparent; }
+  #tabs button.on { color: var(--ink); border-bottom-color: var(--live); }
+
+  /* On a phone the image is the whole point, so the rail shrinks to a strip
+     and the tools collapse to one group at a time rather than a long column. */
+  @media (max-width: 900px) {
+    body { grid-template-columns: 100%; grid-template-rows: auto minmax(0, 1fr) auto; }
+    #rail { border-right: none; border-bottom: 1px solid var(--edge); flex-direction: row;
+      align-items: center; gap: .5rem; padding-right: .5rem; }
+    #rail h2 { padding: 0 0 0 1rem; }
+    #finished { flex-direction: row; overflow-x: auto; overflow-y: hidden;
+      padding: .5rem 0; gap: .4rem; }
+    #finished li { flex: 0 0 3.5rem; }
+    #finished .label { display: none; }
+    #railempty { padding: 0; }
+    #stagewrap { padding: .75rem; }
+    #panel { border-left: none; border-top: 1px solid var(--edge); }
+    #tabs { display: flex; }
+    #panel [data-group] { display: none; }
+    #panel[data-tab=brush] [data-group=brush],
+    #panel[data-tab=mask] [data-group=mask],
+    #panel[data-tab=finish] [data-group=finish] { display: flex; }
+    #panel h2[data-group] { display: none; }
+    .group { padding-top: .75rem; }
+    footer { padding: .5rem .75rem; }
+  }
+  @media (max-width: 900px) and (orientation: landscape) {
+    #rail { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<aside id="rail">
+  <h2>Finished</h2>
+  <p id="railempty">Nothing yet.</p>
+  <ul id="finished"></ul>
+</aside>
+
+<div id="centre">
+  <div id="stagewrap">
+    <div id="drop" tabindex="0" role="button">
+      <span class="pointer-only">Drop an image here, or click to choose.<br>Paste works too.</span>
+      <span class="touch-only">Tap to choose a photo.</span>
+    </div>
+    <div id="stage">
+      <img id="preview" alt="">
+      <canvas id="paint"></canvas>
+    </div>
+  </div>
+  <footer>
+    <span id="status">Loading model</span>
+    <span id="queue"></span>
+  </footer>
+</div>
+
+<aside id="panel" data-tab="brush">
+  <div id="tabs" role="tablist">
+    <button type="button" data-for="brush" class="on">Brush</button>
+    <button type="button" data-for="mask">Mask</button>
+    <button type="button" data-for="finish">Finish</button>
+  </div>
+
+  <h2 data-group="brush">Brush</h2>
+  <div class="group" data-group="brush">
+    <div class="tools-row">
+      <label><input type="radio" name="tool" value="off" checked> Off</label>
+      <label><input type="radio" name="tool" value="keep"><span class="swatch keep"></span> Keep</label>
+      <label><input type="radio" name="tool" value="cut"><span class="swatch cut"></span> Remove</label>
+    </div>
+    <label class="wide">Size
+      <span class="row"><input type="range" id="brush" min="0.01" max="0.3" step="0.005" value="0.06">
+      <output id="brushval">0.06</output></span></label>
+    <label><input type="checkbox" id="smart" checked> Grow to edges</label>
+    <label class="wide">Tolerance
+      <span class="row"><input type="range" id="tol" min="0.02" max="0.4" step="0.01" value="0.12">
+      <output id="tolval">0.12</output></span></label>
+    <div class="actions">
+      <button type="button" id="undo">Undo</button>
+      <button type="button" id="clearstrokes">Clear</button>
+    </div>
+  </div>
+
+  <hr data-group="mask">
+  <h2 data-group="mask">Mask</h2>
+  <div class="group" data-group="mask">
+    <label class="wide">Cut below
+      <span class="row"><input type="range" id="lo" min="0" max="0.95" step="0.01" value="0.3">
+      <output id="loval">0.30</output></span></label>
+    <label class="wide">Solid above
+      <span class="row"><input type="range" id="hi" min="0.05" max="1" step="0.01" value="0.7">
+      <output id="hival">0.70</output></span></label>
+    <label><input type="checkbox" id="fill" checked> Fill holes</label>
+    <label><input type="checkbox" id="letterbox"> Letterbox <span id="lbhint">(re-runs)</span></label>
+    <label><input type="checkbox" id="usebg"> Backdrop
+      <input type="color" id="bg" value="#ffffff"></label>
+    <button type="button" id="reset">Reset to defaults</button>
+  </div>
+
+  <hr data-group="finish">
+  <div class="group" data-group="finish">
+    <a class="save" id="save" download="cutout.png" href="#"><button type="button">Save PNG</button></a>
+    <button type="button" id="done" class="primary">Done</button>
+  </div>
+</aside>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

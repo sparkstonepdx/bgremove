@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>bgremove</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #e8e6e1;
+    --dim: #8a867e;
+    --edge: #2e2c29;
+    --panel: #1a1917;
+    --live: #7fd1b9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: #121110; color: var(--ink);
+    font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
+    display: grid; grid-template-rows: auto 1fr auto; gap: 1.5rem; padding: 2rem 1.5rem;
+  }
+  header { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  h1 { font-size: 1.25rem; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  .note { color: var(--dim); font-size: 0.875rem; }
+  main { display: grid; gap: 1rem; align-content: start; max-width: 1100px; width: 100%; margin: 0 auto; }
+  #drop {
+    border: 1px dashed var(--edge); border-radius: 10px; padding: 3.5rem 1.5rem;
+    text-align: center; color: var(--dim); cursor: pointer; transition: border-color .15s, color .15s;
+  }
+  #drop:hover, #drop.over { border-color: var(--live); color: var(--ink); }
+  #drop.over { border-style: solid; }
+  input[type=file] { display: none; }
+  .controls { display: flex; gap: 1.25rem; align-items: center; flex-wrap: wrap; font-size: 0.875rem; color: var(--dim); }
+  select, input[type=color] { background: var(--panel); color: var(--ink); border: 1px solid var(--edge);
+    border-radius: 6px; padding: .35rem .5rem; font: inherit; }
+  label { display: flex; align-items: center; gap: .4rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+  figure { margin: 0; border: 1px solid var(--edge); border-radius: 10px; overflow: hidden; background: var(--panel); }
+  .canvas {
+    aspect-ratio: 1; display: grid; place-items: center; padding: .75rem;
+    background-image:
+      linear-gradient(45deg, #232220 25%, transparent 25%, transparent 75%, #232220 75%),
+      linear-gradient(45deg, #232220 25%, #1a1917 25%, #1a1917 75%, #232220 75%);
+    background-size: 18px 18px; background-position: 0 0, 9px 9px;
+  }
+  .canvas img { max-width: 100%; max-height: 100%; }
+  figcaption { display: flex; justify-content: space-between; align-items: center; gap: .5rem;
+    padding: .6rem .75rem; border-top: 1px solid var(--edge); font-size: .8125rem; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); }
+  a.save { color: var(--live); text-decoration: none; font-weight: 500; white-space: nowrap; }
+  a.save:hover { text-decoration: underline; }
+  .working .canvas { opacity: .35; }
+  footer { color: var(--dim); font-size: .8125rem; text-align: center; }
+  :focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>bgremove</h1>
+  <span class="note">Everything runs on this machine. Nothing leaves it.</span>
+</header>
+
+<main>
+  <div id="drop" tabindex="0" role="button">Drop images here, or click to choose. Paste works too.</div>
+
+  <div class="controls">
+    <label><input type="checkbox" id="usebg"> Solid backdrop
+      <input type="color" id="bg" value="#ffffff"></label>
+  </div>
+
+  <div class="grid" id="results"></div>
+</main>
+
+<footer id="status">Ready</footer>
+
+<script>
+const drop = document.getElementById('drop');
+const results = document.getElementById('results');
+const status = document.getElementById('status');
+const picker = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*', multiple: true });
+
+drop.addEventListener('click', () => picker.click());
+drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); picker.click(); }});
+picker.addEventListener('change', () => handle([...picker.files]));
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('over');
+  handle([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+});
+window.addEventListener('paste', e => {
+  const files = [...e.clipboardData.files].filter(f => f.type.startsWith('image/'));
+  if (files.length) handle(files);
+});
+
+async function handle(files) {
+  for (const file of files) await run(file);
+}
+
+async function run(file) {
+  const fig = document.createElement('figure');
+  fig.className = 'working';
+  fig.innerHTML = `<div class="canvas"><img alt=""></div>
+    <figcaption><span class="name"></span><span class="save">working...</span></figcaption>`;
+  fig.querySelector('.name').textContent = file.name;
+  fig.querySelector('.canvas img').src = URL.createObjectURL(file);
+  results.prepend(fig);
+
+  const body = new FormData();
+  body.append('image', file);
+  if (document.getElementById('usebg').checked) body.append('bg', document.getElementById('bg').value);
+
+  const started = performance.now();
+  status.textContent = 'Removing background from ' + file.name;
+  try {
+    const res = await fetch('/cutout', { method: 'POST', body });
+    if (!res.ok) throw new Error(await res.text());
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const name = file.name.replace(/\.[^.]+$/, '') + '.cutout.png';
+    fig.querySelector('.canvas img').src = url;
+    fig.querySelector('figcaption').lastElementChild.outerHTML =
+      `<a class="save" download="${name}" href="${url}">Save PNG</a>`;
+    fig.classList.remove('working');
+    status.textContent = `${file.name} done in ${((performance.now() - started) / 1000).toFixed(1)}s`;
+  } catch (err) {
+    fig.querySelector('figcaption').lastElementChild.textContent = 'Failed';
+    fig.classList.remove('working');
+    status.textContent = file.name + ': ' + err.message;
+  }
+}
+</script>
+</body>
+</html>
