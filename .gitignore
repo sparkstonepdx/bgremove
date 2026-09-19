@@ -1,7 +1,5 @@
 # built binaries
-native/bgremove
-wasm/bgremove
-native/cutouts/
+bgremove
 
 node_modules/
 

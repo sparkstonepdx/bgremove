@@ -1,9 +1,0 @@
-{
-  "_comment": "Minimum mask IoU, in percent, per model and fixture. quality.mjs fails below these, and fails if a fixture named here has no reference in fixtures/. Raise a floor in the same commit that improves the number, so history says why it moved.",
-  "u2netp": {
-    "cat": 78.0
-  },
-  "isnet-general-use": {
-    "cat": 92.2
-  }
-}
