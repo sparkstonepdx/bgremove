@@ -22,6 +22,7 @@
 // already ships before anyone wires it into the app.
 import { createCanvas, ImageData as NapiImageData, loadImage } from '@napi-rs/canvas';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -98,11 +99,9 @@ const table = JSON.parse(fs.readFileSync(path.join(webDir, 'profiles.json'), 'ut
 const model = process.env.BGREMOVE_MODEL || table.default;
 await bg.loadProfiles(table, model);
 
-const modelFile = fs.existsSync(path.join(webDir, `${model}.onnx`))
-  ? path.join(webDir, `${model}.onnx`)
-  : path.join(process.env.HOME, '.cache', 'bgremove', `${model}.onnx`);
+const modelFile = path.join(os.homedir(), '.cache', 'bgremove', `${model}.onnx`);
 if (!fs.existsSync(modelFile)) {
-  console.log(`no ${model}.onnx in web/ or ~/.cache/bgremove; run the native build once to fetch it`);
+  console.log(`no ${model}.onnx in ~/.cache/bgremove; npm run quality fetches it`);
   process.exit(0);
 }
 const modelBytes = new Uint8Array(fs.readFileSync(modelFile));

@@ -109,25 +109,11 @@ If a setting works better than the default across several of your own photos,
 change `profiles.json` in both builds rather than reaching for the sliders
 each time.
 
-## Staying in line with the native build
+## Where the settings live
 
 Everything a model needs is in `web/profiles.json`: input normalisation, the
-alpha ramp, whether to letterbox, whether to fill holes. `native/profiles.json`
-is a byte-identical copy that the Go binary embeds. Neither build hardcodes a
-constant, and `harness/parity.mjs` fails if the two copies differ, if the
-browser pipeline stops reading the file, or if the two produce different masks
-on the same image.
-
-Current parity on the fixtures, mean absolute alpha out of 255:
-
-| model | agreement | quality vs reference |
-|---|---|---|
-| u2netp | 1.87 | native 77.5% IoU, wasm 78.6% |
-| isnet-general-use | 0.33 | native 92.7% IoU, wasm 92.8% |
-
-The residual is resampling: node-canvas and Go's own scaler round differently.
-A real browser will differ from both by a similar amount, which is why the
-tolerance is 4 rather than 0.
+alpha ramp, whether to letterbox, whether to fill holes, how forgiving the
+remove brush is. Nothing is hardcoded in the pipeline.
 
 Three things drive the quality number. **Normalisation is per model**: u2net
 uses the ImageNet constants, isnet uses 0.5 and 1.0, and feeding isnet the
@@ -151,15 +137,15 @@ the `ort` module. That is the whole reason it can be tested in Node.
 
 ```
 cd harness && npm install
-npm test        # pipeline and DOM, no native binary needed
-npm run parity  # also diffs against the native build
-npm run check   # all three
+npm test         # pipeline, DOM workflow, model fallback
+npm run quality  # output scored against reference cutouts
+npm run check    # both
 ```
 
-`parity.mjs` needs `native/bgremove` built; it skips that section with a note
-rather than failing if the binary is absent. It follows whatever
-`profiles.json` names as the default; `BGREMOVE_MODEL=u2netp npm run parity`
-checks a different one.
+`quality.mjs` runs each model in its own process, because `bg.js` keeps one
+session the way a page does. It fetches any model it does not find in
+`~/.cache/bgremove` rather than skipping, since a skipped quality check is how
+a broken model stays broken.
 
 ### Scoring a click refiner
 
@@ -219,10 +205,11 @@ model fetch, since Node takes the model as bytes instead.
 
 ## Swapping the model
 
-Add an entry to `profiles.json`, copy the file to `native/`, and start with
-`-model <name>`. The input resolution comes from the model's own metadata, so
-nothing in the code changes. Only u2netp is embedded; everything else is
-fetched once.
+Add an entry to `profiles.json` and start with `-model <name>`. The input
+resolution comes from the model's own metadata, so nothing in the code
+changes. Every model is fetched on first use into `~/.cache/bgremove`; none
+are vendored. Add a floor for it in `harness/expected.json` so it is covered
+by `npm run quality`.
 
 | name | size | license | |
 |---|---|---|---|

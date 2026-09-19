@@ -5,5 +5,11 @@
   "dependencies": {
     "onnxruntime-web": "1.23.0"
   },
-  "type": "module"
+  "type": "module",
+  "workspaces": [
+    "harness"
+  ],
+  "scripts": {
+    "check": "npm run check --workspace harness"
+  }
 }

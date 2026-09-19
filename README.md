@@ -1,32 +1,39 @@
 # bgremove
 
-Two takes on local background removal. Both are Go, both keep every image on
-the machine, and both use the same ONNX segmentation models.
+Background removal that runs in the browser tab. One Go binary serves a page
+that does the inference locally; no image leaves the machine and nothing is
+uploaded anywhere.
 
-    native/   CLI and local server. Real batch mode. Needs cgo and the
-              ONNX Runtime shared library, which it downloads on first run.
+```
+cd wasm
+npm install                          # the ONNX Runtime the page loads
+CGO_ENABLED=0 go build -o bgremove .
+./bgremove                           # http://127.0.0.1:7734
+```
 
-    wasm/     Inference in the browser tab. No cgo, single static binary,
-              cross-compiles anywhere Go does. Ships u2netp embedded and
-              fetches any larger model once on demand.
+`npm install` is a build prerequisite, not a convenience: the binary embeds
+the runtime out of `node_modules`, so `go build` fails without it.
 
-Both read the same `profiles.json`, and `wasm/harness/parity.mjs` fails if
-they drift apart or produce different masks on the same image:
+## Tests
 
-    cd wasm/harness && npm install && npm run check
+```
+cd wasm/harness && npm install
+npm test       # pipeline, DOM workflow, model fallback
+npm run quality  # output scored against reference cutouts, fails on regression
+npm run check    # both
+npm run clicks   # how many corrective clicks it takes to reach 95% IoU
+```
 
-Default model is isnet-general-use: 92.7% mask IoU against an erase.bg cutout
-of the test photo, where u2netp gets 77.5%. Of everything reachable, only
-isnet makes that jump; silueta at 44 MB and u2net at 175 MB both score worse
-than the 4 MB u2netp on this image. The two builds land within 0.1 IoU of each
-other on the same model.
+`npm run quality` is the one that matters most. Everything else checks that
+the machinery runs, and a model fed the wrong normalisation constants runs
+perfectly while returning a blank mask. Floors live in
+`wasm/harness/expected.json`; fixtures are `<name>.jpg` plus `<name>.ref.png`
+in `wasm/harness/fixtures/`, where the reference is a real cutout.
 
-One reference photo is a sample of one, so treat those numbers accordingly.
-`wasm/harness/fixtures/` takes more pairs, as `<name>.jpg` plus
-`<name>.ref.png`, and everything below is scored across whatever is in there.
+Current numbers on the one fixture, mask IoU against an erase.bg cutout:
+u2netp 78.6%, isnet-general-use 92.8%. One reference photo is a sample of
+one, so more pairs are worth more than more tuning.
 
-    npm run check    both builds agree, and neither regressed
-    npm run clicks   how many corrective clicks it takes to reach 95%
-
-Every model used here is Apache-2.0 or MIT. rembg's own default, bria-rmbg,
-is non-commercial only and is used by neither.
+Models are Apache-2.0 or MIT and fetched on first use into
+`~/.cache/bgremove`. rembg's own default, bria-rmbg, is non-commercial only
+and is not used.

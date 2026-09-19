@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "node run.mjs && node dom.mjs && node fallback.mjs",
-    "parity": "node parity.mjs",
+    "quality": "node quality.mjs",
     "clicks": "node clicks.mjs",
-    "check": "npm test && npm run parity"
+    "check": "npm test && npm run quality"
   },
   "keywords": [],
   "author": "",
