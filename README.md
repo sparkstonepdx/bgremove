@@ -185,7 +185,26 @@ npm run check    # both
 `quality.mjs` runs each model in its own process, because `bg.js` keeps one
 session the way a page does. It fetches any model it does not find in
 `~/.cache/bgremove` rather than skipping, since a skipped quality check is how
-a broken model stays broken.
+a broken model stays broken. Scoring happens on a grid capped at 1024 pixels
+on the long edge: at full resolution several 12-megapixel canvases live
+alongside a 1.3 GB wasm heap, and the run dies partway through on a modest
+machine. Floors in `expected.json` are recorded at that size.
+
+Thirteen fixtures: one photo of mine, plus twelve portraits from the P3M demo
+set, which ships hand-annotated ground truth alpha under MIT. The two models
+fail differently and neither wins everywhere:
+
+| | u2netp | isnet-general-use |
+|---|---|---|
+| best | 99.1% | 99.4% |
+| worst | 38.2% | 59.6% |
+| below 90% | 4 of 13 | 4 of 13 |
+
+u2netp collapses on three portraits by losing 16 to 22% of the subject. isnet
+recovers two of those, one going 47.4% to 96.6%, but is worse elsewhere:
+62.2% on an image where it keeps 11.3% extra background, against 94.1% for
+u2netp on the same one. Choosing a default off a single photo, which is what
+the earlier numbers here rested on, was not enough evidence.
 
 ### Scoring a click refiner
 

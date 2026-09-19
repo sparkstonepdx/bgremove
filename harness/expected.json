@@ -1,9 +1,33 @@
 {
-  "_comment": "Minimum mask IoU, in percent, per model and fixture. quality.mjs fails below these, and fails if a fixture named here has no reference in fixtures/. Raise a floor in the same commit that improves the number, so history says why it moved.",
+  "_comment": "Minimum mask IoU, in percent, per model and fixture, measured on a grid capped at 1024px on the long edge. quality.mjs fails below these, and fails if a fixture named here has no reference in fixtures/. Raise a floor in the same commit that improves the number, so history says why it moved.",
   "u2netp": {
-    "cat": 78.0
+    "cat": 78.1,
+    "p3m-07141906": 93.6,
+    "p3m-09ba26b4": 93.0,
+    "p3m-22fc0130": 94.3,
+    "p3m-514ca06a": 46.9,
+    "p3m-51c916fc": 55.0,
+    "p3m-71bcce3a": 37.6,
+    "p3m-818e689d": 98.2,
+    "p3m-a09f6d7a": 93.0,
+    "p3m-bac3c1ff": 98.4,
+    "p3m-bc5cfad1": 98.6,
+    "p3m-bd6af989": 95.5,
+    "p3m-d684dae3": 95.8
   },
   "isnet-general-use": {
-    "cat": 92.2
+    "cat": 92.3,
+    "p3m-07141906": 61.6,
+    "p3m-09ba26b4": 83.1,
+    "p3m-22fc0130": 97.2,
+    "p3m-514ca06a": 96.0,
+    "p3m-51c916fc": 90.2,
+    "p3m-71bcce3a": 59.1,
+    "p3m-818e689d": 92.8,
+    "p3m-a09f6d7a": 95.9,
+    "p3m-bac3c1ff": 98.5,
+    "p3m-bc5cfad1": 98.9,
+    "p3m-bd6af989": 96.2,
+    "p3m-d684dae3": 95.3
   }
 }

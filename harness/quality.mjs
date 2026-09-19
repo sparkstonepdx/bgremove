@@ -44,6 +44,13 @@ const expected = Object.fromEntries(
   Object.entries(expectedFile).filter(([k]) => !k.startsWith('_')),
 );
 
+// Score on a grid capped at this many pixels on the long edge. Full
+// resolution means several 12-megapixel canvases live at once next to a
+// 1.3 GB wasm heap, which puts the run at the mercy of whatever else the
+// machine is doing. The ranking does not change; the absolute numbers shift
+// slightly, so the floors are recorded at this size.
+const GRID = 1024;
+
 let failures = 0;
 const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'pass' : 'FAIL'}  ${name}${detail ? '  ' + detail : ''}`);
@@ -151,13 +158,13 @@ if (!only) {
       continue;
     }
     const bitmap = await loadImage(path.join(here, 'fixtures', pair.image));
-    const pred = await bg.predict(bitmap, bytes);
-    const mask = await alphaOf(
-      Buffer.from(await (await bg.cutout(bitmap, null, bytes)).arrayBuffer()),
-    );
+    const scale = Math.min(1, GRID / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const cut = Buffer.from(await (await bg.cutout(bitmap, null, bytes)).arrayBuffer());
+    const mask = await alphaOf(cut, w, h);
     const ref = await alphaOf(
-      fs.readFileSync(path.join(here, 'fixtures', `${pair.stem}.ref.png`)),
-      bitmap.width, bitmap.height,
+      fs.readFileSync(path.join(here, 'fixtures', `${pair.stem}.ref.png`)), w, h,
     );
     const r = report(mask, ref);
     check(`${pair.image}: IoU at or above ${floor}%`, r.iou >= floor,
@@ -165,7 +172,6 @@ if (!only) {
     if (r.iou > floor + 1) {
       console.log(`      improved by ${(r.iou - floor).toFixed(2)} points; raise the floor in expected.json`);
     }
-    void pred;
   }
 }
 
