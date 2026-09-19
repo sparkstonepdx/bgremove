@@ -35,6 +35,7 @@ export function useProfile(name) {
     letterbox: p.letterbox,
     fillHoles: p.fillHoles,
     protect: p.protect ?? 0.85,
+    protectShare: p.protectShare ?? 0.25,
   });
   return p;
 }
@@ -341,18 +342,25 @@ export function toMaskCanvas(pred, opts = {}) {
   // Brush strokes are applied last, so they always beat the model and the
   // ramp. Green adds, red removes.
   const protect = opts.protect ?? profile.protect ?? 0;
+  const protectShare = opts.protectShare ?? profile.protectShare ?? 0.25;
 
-  // Drop the part of a remove stroke that landed on confident subject. If the
-  // whole stroke did, the person meant it, so it stands: this forgives a slip
-  // without taking away deliberate removal.
+  // Drop the part of a remove stroke that landed on confident subject, unless
+  // enough of the stroke is on confident subject that it was the target.
+  // Judged per stroke: merging strokes first would let a careful dab elsewhere
+  // change what a sloppy one does.
   const forgive = (painted) => {
     if (!protect) return painted;
     const kept = new Uint8Array(painted.length);
-    let any = 0;
+    let total = 0;
+    let confident = 0;
     for (let i = 0; i < painted.length; i++) {
-      if (painted[i] && norm[i] < protect) { kept[i] = 1; any++; }
+      if (!painted[i]) continue;
+      total++;
+      if (norm[i] < protect) kept[i] = 1;
+      else confident++;
     }
-    return any ? kept : painted;
+    if (!total) return painted;
+    return confident / total >= protectShare ? painted : kept;
   };
 
   const apply = (mode, value) => {
@@ -360,11 +368,10 @@ export function toMaskCanvas(pred, opts = {}) {
     if (!picked.length) return;
     const soften = mode === 'cut' ? forgive : (x) => x;
 
-    const plain = picked.filter((s) => !s.grow);
-    const seeded = picked.filter((s) => s.grow);
-    let area = plain.length ? soften(strokeMask(plain, pred)) : new Uint8Array(SIZE * SIZE);
-    for (const stroke of seeded) {
-      const region = grow(pred, soften(strokeMask([stroke], pred)), stroke.grow);
+    const area = new Uint8Array(SIZE * SIZE);
+    for (const stroke of picked) {
+      const painted = soften(strokeMask([stroke], pred));
+      const region = stroke.grow ? grow(pred, painted, stroke.grow) : painted;
       for (let i = 0; i < area.length; i++) if (region[i]) area[i] = 1;
     }
 

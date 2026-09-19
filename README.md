@@ -73,14 +73,19 @@ directly: strokes are applied after the ramp and after hole filling, so they
 always win. Undo drops the last stroke.
 
 Red is forgiving on purpose. A remove stroke is usually aimed at background
-near an edge, so the part of it that lands on pixels the model is confident
-are subject is treated as a slip and ignored. Slop over the boundary and you
-take the background you crossed without gouging what you are keeping. If the
-whole stroke lands on confident subject then you meant it, and it stands, so
-deliberate removal still works. Green gets no such treatment: painting green
-over confident background is how you recover something the model dropped,
-which is the entire point of it. The threshold is `protect` in
-`profiles.json`; 0 makes red literal.
+near an edge, so the part of it that clips pixels the model is confident are
+subject is treated as a slip and ignored: you take the background you crossed
+without gouging what you are keeping.
+
+That only applies while the clipped part is a minority of the stroke. Put a
+quarter or more of a stroke on confident subject and you are aiming at it, so
+it goes. Both numbers are in `profiles.json`, as `protect` and `protectShare`;
+`protect: 0` makes red literal. Green gets no such treatment, because painting
+green over confident background is how you recover something the model
+dropped.
+
+Forgiveness is judged per stroke. Judging it across the whole set would let a
+careful dab somewhere else change what a sloppy one does.
 
 **Grow to edges** is what makes a dab useful. With it off, a stroke stamps the
 brush shape and nothing more. With it on, the stroke is a seed: it spreads

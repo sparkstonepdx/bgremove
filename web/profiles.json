@@ -1,5 +1,5 @@
 {
-  "_comment": "Canonical model settings. The default is isnet-general-use: 178 MB, fetched once, and the only model here that scores near a commercial cutout. native/profiles.json is a byte-identical copy; harness/parity.mjs fails if they differ. Each family was trained with its own input normalisation, so mean and std are not interchangeable: feeding isnet the ImageNet constants returns a blank mask. protect is how much of a red stroke to ignore where the model is confident it found subject, so a sloppy remove stroke does not gouge the thing you are keeping; 0 makes red literal.",
+  "_comment": "Canonical model settings. The default is isnet-general-use: 178 MB, fetched once, and the only model here that scores near a commercial cutout. native/profiles.json is a byte-identical copy; harness/parity.mjs fails if they differ. Each family was trained with its own input normalisation, so mean and std are not interchangeable: feeding isnet the ImageNet constants returns a blank mask. protect is how much of a red stroke to ignore where the model is confident it found subject, so a sloppy remove stroke does not gouge the thing you are keeping; 0 makes red literal. protectShare is how much of a stroke has to land on confident subject before it counts as aiming at it rather than slipping.",
   "default": "isnet-general-use",
   "models": {
     "u2netp": {
@@ -15,7 +15,8 @@
       },
       "fillHoles": true,
       "note": "Small enough to embed. Loses thin low-contrast parts of a subject.",
-      "protect": 0.85
+      "protect": 0.85,
+      "protectShare": 0.25
     },
     "u2net": {
       "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx",
@@ -30,7 +31,8 @@
       },
       "fillHoles": true,
       "note": "Letterboxing hurts this family badly; it was trained on squashed input.",
-      "protect": 0.85
+      "protect": 0.85,
+      "protectShare": 0.25
     },
     "u2net_human_seg": {
       "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net_human_seg.onnx",
@@ -45,7 +47,8 @@
       },
       "fillHoles": true,
       "note": "People only.",
-      "protect": 0.85
+      "protect": 0.85,
+      "protectShare": 0.25
     },
     "isnet-general-use": {
       "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx",
@@ -60,7 +63,8 @@
       },
       "fillHoles": true,
       "note": "Best of the set. 1024 input, so several times slower than u2netp.",
-      "protect": 0.85
+      "protect": 0.85,
+      "protectShare": 0.25
     },
     "silueta": {
       "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/silueta.onnx",
@@ -75,7 +79,8 @@
       },
       "fillHoles": true,
       "note": "u2net architecture at a tenth the size.",
-      "protect": 0.85
+      "protect": 0.85,
+      "protectShare": 0.25
     }
   }
 }

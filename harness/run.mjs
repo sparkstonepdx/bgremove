@@ -294,13 +294,17 @@ check('a perfect mask asks for no click', sim.nextClick(truth, truth, 40, 40) ==
 const midPoint = { x: 0.5, y: 0.5 };    // solidly subject in the fixture
 const bgPoint = { x: 0.06, y: 0.06 };   // solidly background
 
-const sloppy = [{ mode: 'cut', size: 0.5, points: [midPoint] }];
+// a slip: a stroke riding background that takes a small bite out of the
+// subject edge. Same stroke, literal against forgiving.
+const edge = { x: 0.21, y: 0.8 };   // subject starts at about 0.23
+const bite = { x: 0.245, y: 0.8 };
+const sloppy = [{ mode: 'cut', size: 0.08, points: [edge] }];
 const literal = bg.compose(bitmap, pred, { strokes: sloppy, protect: 0 });
 const forgiving = bg.compose(bitmap, pred, { strokes: sloppy, protect: 0.85 });
-check('without forgiveness red cuts straight through the subject',
-  alphaAt(literal, 0.5, 0.5) === 0, String(alphaAt(literal, 0.5, 0.5)));
-check('with forgiveness a slip onto the subject is ignored',
-  alphaAt(forgiving, 0.5, 0.5) > 200, String(alphaAt(forgiving, 0.5, 0.5)));
+check('without forgiveness red cuts into the subject edge it clipped',
+  alphaAt(literal, bite.x, bite.y) === 0, String(alphaAt(literal, bite.x, bite.y)));
+check('with forgiveness that bite is ignored',
+  alphaAt(forgiving, bite.x, bite.y) > 200, String(alphaAt(forgiving, bite.x, bite.y)));
 
 // the same stroke must still remove the background half it covered
 const straddle = [{ mode: 'cut', size: 0.3, points: [{ x: 0.2, y: 0.2 }] }];
@@ -314,6 +318,33 @@ const onlySubject = [{ mode: 'cut', size: 0.12, points: [midPoint] }];
 const deliberate = bg.compose(bitmap, pred, { strokes: onlySubject, protect: 0.85 });
 check('a stroke entirely on the subject is taken as meant',
   alphaAt(deliberate, 0.5, 0.5) === 0, String(alphaAt(deliberate, 0.5, 0.5)));
+
+// ...and so must a wide one that also covers background. Judging forgiveness
+// by "did any of it touch background" made a careful dab work where a broad
+// stroke over the same spot did nothing, which is backwards.
+for (const size of [0.12, 0.3, 0.6]) {
+  const wide = [{ mode: 'cut', size, points: [midPoint] }];
+  const out = bg.compose(bitmap, pred, { strokes: wide, protect: 0.85 });
+  check(`a stroke of size ${size} aimed at the subject removes it`,
+    alphaAt(out, 0.5, 0.5) === 0, String(alphaAt(out, 0.5, 0.5)));
+}
+
+// a thin stroke that mostly rides background still spares what it clips
+const clipping = [{ mode: 'cut', size: 0.02, points: [{ x: 0.5, y: 0.14 }] }];
+const spared = bg.compose(bitmap, pred, { strokes: clipping, protect: 0.85 });
+check('a stroke mostly on background still spares the subject it clips',
+  alphaAt(spared, 0.5, 0.5) > 200, String(alphaAt(spared, 0.5, 0.5)));
+
+// forgiveness is judged per stroke, not across the set
+const pair = [
+  { mode: 'cut', size: 0.12, points: [midPoint] },
+  { mode: 'cut', size: 0.02, points: [{ x: 0.5, y: 0.14 }] },
+];
+check('one stroke does not change what another does',
+  alphaAt(bg.compose(bitmap, pred, { strokes: pair, protect: 0.85 }), 0.5, 0.5) === 0);
+
+check('protectShare comes from the profile table', bg.profile.protectShare === 0.25,
+  String(bg.profile.protectShare));
 
 // green is not softened: recovering a dropped region is the point of it
 const greenOnBg = [{ mode: 'keep', size: 0.25, points: [bgPoint] }];
