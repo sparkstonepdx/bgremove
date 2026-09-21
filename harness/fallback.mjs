@@ -3,10 +3,10 @@
 //
 // The configured model can be 178 MB running at 1024x1024, which a browser
 // may refuse on memory alone. A dead page is a worse answer than a weaker
-// mask, so the page drops to the model compiled into the binary.
+// mask, so the page drops to u2netp, which the build always includes.
 import { createCanvas, ImageData as NapiImageData } from '@napi-rs/canvas';
 import fs from 'node:fs';
-import { modelBytes } from './models.mjs';
+import { modelBytes } from '../scripts/models.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

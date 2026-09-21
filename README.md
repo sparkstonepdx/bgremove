@@ -1,42 +1,37 @@
 # bgremove
 
-Background removal that runs in the browser tab. No image leaves the machine.
+Background removal that runs in the browser tab. No image leaves the machine,
+and there is no server: the whole thing is a static site.
 
 ```
-pnpm install                                   # the runtime the page loads
-CGO_ENABLED=0 go build -o bgremove .
-./bgremove                                     # http://127.0.0.1:7734
-./bgremove -model u2netp -dir site/            # a static site, see below
+pnpm install
+pnpm build            # writes site/ with the default model
+pnpm serve            # http://localhost:3000
 ```
 
-`pnpm install` has to come first: the binary embeds the ONNX Runtime and the
-isolation service worker straight out of `node_modules`, so `go build` fails
-without them. `pnpm-workspace.yaml` sets `nodeLinker: hoisted` for the same
-reason. pnpm's default layout is a tree of symlinks, and `go:embed` will not
-follow a symlink.
-
-Models are not in the repo. Whichever one you ask for is fetched on first use
-into `~/.cache/bgremove`. The default is isnet-general-use at 178 MB; u2netp
-is 4.5 MB and is the one the static site ships, for reasons under Hosting.
+`pnpm build --model u2netp` picks a model; `--out dir` writes somewhere other
+than `site/`. Models are not in the repo. Whichever one you ask for is fetched
+on first use into `~/.cache/bgremove` and copied into the site. The default is
+isnet-general-use at 178 MB; u2netp is 4.5 MB and is the one GitHub Pages
+ships, for reasons under Hosting.
 
 ## Hosting it as a static site
 
-```
-./bgremove -model u2netp -dir site/
-```
-
-That writes a self-contained directory: the page, the runtime, the model, a
-`config.json` naming which model was written, and a service worker. Any static
-host will serve it, GitHub Pages included. There is no server-side anything.
+`scripts/build.mjs` copies the page, the runtime, one model, and a service
+worker into `site/`, and writes a `config.json` naming which model it put
+there. That file matters more than it looks: without it the page falls back
+to whatever `profiles.json` calls default, and one model's normalisation on
+another's weights returns a blank mask rather than an error. Any static host
+will serve the result.
 
 Two constraints worth knowing before you push it.
 
-**Headers.** A static host cannot set `Cross-Origin-Opener-Policy` and
-`Cross-Origin-Embedder-Policy`, which is what unlocks SharedArrayBuffer and
-therefore threads. The export ships `coi-serviceworker`, a service worker that
-adds those headers to every response and reloads once on first visit, which is
-the usual way around this on Pages. On a host that sets the headers itself it
-does nothing.
+**Headers.** Threads need SharedArrayBuffer, which needs
+`Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy`, and a static
+host cannot set either. The build ships `coi-serviceworker`, which adds them to
+every response client-side and reloads once on first visit. On a host that
+sets the headers itself it does nothing. Without either, the page still works,
+single-threaded, and the status line says so.
 
 **Model size.** GitHub rejects files over 100 MB, so u2netp at 4.5 MB is fine
 and isnet at 178 MB cannot go in the repo. Fetching it at runtime from the
@@ -48,17 +43,9 @@ under the limit and reassembled in the page.
 The whole site with u2netp is about 16 MB, most of it the 12 MB runtime.
 
 `.github/workflows/pages.yml` does all of that on every push to `main`: frozen
-install, build, `pnpm test`, the quality floors for the model being shipped,
-then the export and the deploy. A failing test stops the deploy. It needs one
+install, `pnpm test`, the quality floors for the model being shipped, then the
+build and the deploy. A failing test stops the deploy. It needs one
 setting changed by hand, once: Settings, Pages, Source, set to GitHub Actions.
-
-## Why the server exists at all
-
-Only to set `Cross-Origin-Opener-Policy: same-origin` and
-`Cross-Origin-Embedder-Policy: require-corp`. Those unlock SharedArrayBuffer,
-which is what lets the runtime use more than one thread. Open the page from
-`file://` or host it without those headers and it still works, single-threaded
-and several times slower; the status line tells you which mode you are in.
 
 ## Workflow
 
@@ -92,9 +79,10 @@ first version of this page.
 
 The bigger problem is the model. isnet is 178 MB and runs at 1024x1024, and a
 phone can refuse it on memory alone. If the configured model fails to load,
-the page falls back to u2netp, which the server always has on hand for exactly
+the page falls back to u2netp, which the build always includes for exactly
 this and which `config.json` names, adopts that profile's defaults, and says so in the status line rather than leaving a dead
-page. `-model u2netp` avoids the question entirely at a real cost in quality.
+page. Building with `--model u2netp` avoids the question entirely, at a real
+cost in quality.
 
 None of the layout above has been tested. linkedom has no layout engine, so
 the harness can check that the brush releases touch gestures and that the tabs
@@ -275,7 +263,7 @@ model fetch, since Node takes the model as bytes instead.
 
 ## Swapping the model
 
-Add an entry to `profiles.json` and start with `-model <name>`. The input
+Add an entry to `profiles.json` and build with `--model <name>`. The input
 resolution comes from the model's own metadata, so nothing in the code
 changes. Every model is fetched on first use into `~/.cache/bgremove`; none
 are vendored. Add a floor for it in `harness/expected.json` so it is covered
@@ -283,9 +271,10 @@ by `pnpm run quality`.
 
 | name | size | license | |
 |---|---|---|---|
-| `u2netp` | 4.5 MB | Apache-2.0 | bundled here |
-| `u2net` | 176 MB | Apache-2.0 | cleaner masks |
-| `isnet-general-use` | 176 MB | Apache-2.0 | sharper edges, `SIZE = 1024` |
+| `u2netp` | 4.5 MB | Apache-2.0 | what GitHub Pages ships |
+| `u2net` | 176 MB | Apache-2.0 | |
+| `isnet-general-use` | 178 MB | Apache-2.0 | the default; 1024 input |
+| `silueta` | 44 MB | Apache-2.0 | |
 
 rembg's own default, `bria-rmbg`, is non-commercial only and is deliberately
 not listed.

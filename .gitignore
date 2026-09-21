@@ -1,11 +1,2 @@
-# built binaries
-bgremove
-
 node_modules/
-
-# Vendored at 16 MB, fetched by wasm/web/fetch-assets.sh rather than carried
-# in history, so patches stay small enough to read.
-wasm/web/*.onnx
-wasm/web/ort-wasm-simd-threaded.wasm
-wasm/web/ort-wasm-simd-threaded.mjs
-wasm/web/ort.wasm.min.mjs
+site/

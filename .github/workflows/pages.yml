@@ -37,20 +37,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-
       # Frozen, so a lockfile that has drifted from package.json fails here
       # rather than quietly resolving something different in CI.
       - run: pnpm install --frozen-lockfile
-
-      # The runtime is embedded out of node_modules, so this has to come after
-      # the install. It needs real directories there, not symlinks, which is
-      # why pnpm-workspace.yaml sets nodeLinker: hoisted.
-      - run: go build -o bgremove .
-        env:
-          CGO_ENABLED: '0'
 
       - name: Test
         working-directory: harness
@@ -64,8 +53,8 @@ jobs:
         env:
           BGREMOVE_MODEL: ${{ env.MODEL }}
 
-      - name: Export the static site
-        run: ./bgremove -model "$MODEL" -dir site
+      - name: Build the static site
+        run: pnpm build --model "$MODEL"
 
       - uses: actions/configure-pages@v6
 

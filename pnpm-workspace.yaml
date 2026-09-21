@@ -1,12 +1,5 @@
-# harness is listed so one lockfile covers it and a single frozen install in
-# CI gets everything; package.json already declares it as an npm workspace
 packages:
   - harness
-
-# go:embed will not follow symlinks, and pnpm's default layout is a tree of
-# them into node_modules/.pnpm. Hoisted gives real directories, which is the
-# only way the binary can embed the runtime straight out of node_modules.
-nodeLinker: hoisted
 
 allowBuilds:
   protobufjs: true

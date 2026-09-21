@@ -1,5 +1,5 @@
-// Checks that a site written with -dir is self-contained: every local file the
-// page asks for is actually there.
+// Checks that the built site is self-contained: every local file the page asks
+// for is actually there.
 //
 // This exists because the export shipped without config.json. The page then
 // fell back to whatever profiles.json calls default, which was a different
@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
-const binary = path.join(root, 'bgremove');
+const build = path.join(root, 'scripts', 'build.mjs');
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -21,16 +21,10 @@ const check = (name, ok, detail = '') => {
   if (!ok) failures++;
 };
 
-if (!fs.existsSync(binary)) {
-  // Not a skip: in CI a missing binary means the build step broke, and a test
-  // that passes because there was nothing to test is worse than no test.
-  check('the binary exists to export with', false, 'run pnpm install && go build -o bgremove . first');
-  process.exit(1);
-}
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bgexport-'));
 const model = process.env.BGREMOVE_MODEL || 'u2netp';
-execFileSync(binary, ['-model', model, '-dir', dir], { stdio: 'pipe' });
+execFileSync(process.execPath, [build, '--model', model, '--out', dir], { stdio: 'pipe' });
 
 const present = new Set(fs.readdirSync(dir));
 

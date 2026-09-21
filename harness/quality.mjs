@@ -14,7 +14,7 @@
 // record of why.
 import { createCanvas, ImageData as NapiImageData, loadImage } from '@napi-rs/canvas';
 import fs from 'node:fs';
-import { modelBytes } from './models.mjs';
+import { modelBytes } from '../scripts/models.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

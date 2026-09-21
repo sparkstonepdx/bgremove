@@ -1,16 +1,21 @@
 {
   "name": "bgremove-wasm",
   "private": true,
-  "description": "The ONNX Runtime build the page loads. Declared here so a package manager owns it instead of a fetch script; the Go binary embeds it from node_modules at build time.",
+  "description": "A background remover that runs in the browser tab. scripts/build.mjs copies the page, the runtime, and one model into a static site.",
   "dependencies": {
     "coi-serviceworker": "^0.1.7",
     "onnxruntime-web": "1.23.0"
   },
   "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "serve": "serve site",
+    "check": "pnpm --filter harness check"
+  },
+  "devDependencies": {
+    "serve": "14.2.6"
+  },
   "workspaces": [
     "harness"
-  ],
-  "scripts": {
-    "check": "npm run check --workspace harness"
-  }
+  ]
 }
