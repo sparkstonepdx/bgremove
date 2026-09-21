@@ -62,6 +62,12 @@ jobs:
         working-directory: harness
         run: pnpm test
 
+      # The page in a real Chrome, for what the Node tests cannot see: layout,
+      # the file picker, and races against the model download.
+      - name: Browser test
+        working-directory: harness
+        run: pnpm run browser
+
       # Only the model being deployed, so every deploy is graded on exactly
       # what goes out.
       - name: Quality floors for the shipped model

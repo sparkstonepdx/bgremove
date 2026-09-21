@@ -24,17 +24,21 @@ let queue = Promise.resolve();
 
 const tool = () => document.querySelector('input[name=tool]:checked')?.value || 'off';
 
-function newItem(file) {
+// Settings are taken from the profile when the image is processed, not when
+// it is picked: a photo picked before the model table has loaded would
+// otherwise carry the placeholder defaults, letterbox off included, and isnet
+// without letterboxing loses about twelve points of IoU.
+function profileSettings() {
   return {
-    file,
-    strokes: [],
-    settings: {
-      clean: { ...profile.clean },
-      fillHoles: profile.fillHoles,
-      letterbox: profile.letterbox,
-      bg: null,
-    },
+    clean: { ...profile.clean },
+    fillHoles: profile.fillHoles,
+    letterbox: profile.letterbox,
+    bg: null,
   };
+}
+
+function newItem(file) {
+  return { file, strokes: [], settings: null };
 }
 
 // ---------------------------------------------------------------- rendering
@@ -76,6 +80,7 @@ function render() {
 // over the pixels. Anything else and a stroke lands where it was not drawn.
 function fitStage(bitmap) {
   stage.style.aspectRatio = `${bitmap.width} / ${bitmap.height}`;
+  stage.dataset.fit = '';
   requestAnimationFrame(() => {
     paint.width = stage.clientWidth;
     paint.height = stage.clientHeight;
@@ -127,14 +132,30 @@ function adopt(item) {
 function open(item) {
   current = item;
   document.body.classList.add('editing');
-  adopt(item);
+  if (item.settings) adopt(item);
   // one URL per image for its whole life, so reopening does not leak a new one
   item.original ||= URL.createObjectURL(item.file);
+  if (!item.bitmap) delete stage.dataset.fit;
   ghost.src = item.original;
   preview.src = item.url || item.original;
-  status.textContent = item.pred ? `Editing ${item.file.name}` : `Removing background from ${item.file.name}`;
+  // Size the stage as soon as the image itself has loaded, rather than after
+  // the processing queue gets to it: that queue waits on the model download
+  // and on any earlier image, and until the stage has the right aspect ratio
+  // the preview and the guide are laid out in boxes that disagree.
+  if (!item.bitmap) {
+    preview.addEventListener('load', () => {
+      if (current !== item || item.bitmap) return;
+      fitStage({ width: preview.naturalWidth, height: preview.naturalHeight });
+    }, { once: true });
+  }
+  status.textContent = item.pred
+    ? `Editing ${item.file.name}`
+    : bootError === null && !modelReady
+      ? `${item.file.name} will start once the model has loaded`
+      : `Removing background from ${item.file.name}`;
 
   if (item.bitmap) {
+    stage.classList.remove('busy');
     fitStage(item.bitmap);
     render();
     return;
@@ -144,16 +165,26 @@ function open(item) {
   queue = queue.then(async () => {
     const started = performance.now();
     try {
+      if (bootError) throw new Error(`the model did not load (${bootError})`);
+      // the queue starts behind boot, so the real profile is loaded by now
+      item.settings ||= profileSettings();
+      if (current === item) adopt(item);
+      status.textContent = `Removing background from ${item.file.name}`;
       item.bitmap = await createImageBitmap(item.file);
-      fitStage(item.bitmap);
+      // the person may have opened something else while this waited its turn
+      if (current === item) fitStage(item.bitmap);
       item.pred = await predict(item.bitmap);
-      stage.classList.remove('busy');
-      if (current === item) render();
+      if (current === item) {
+        stage.classList.remove('busy');
+        render();
+      }
       status.textContent = `${item.file.name} done in ${((performance.now() - started) / 1000).toFixed(1)}s`;
     } catch (err) {
-      stage.classList.remove('busy');
       status.textContent = `${item.file.name}: ${err.message}`;
-      if (current === item) close();
+      if (current === item) {
+        stage.classList.remove('busy');
+        close();
+      }
     }
   });
 }
@@ -163,6 +194,7 @@ function close() {
   document.body.classList.remove('editing');
   preview.removeAttribute('src');
   ghost.removeAttribute('src');
+  delete stage.dataset.fit;
   drawStrokes();
 }
 
@@ -226,7 +258,15 @@ $('drop').addEventListener('click', () => picker.click());
 $('drop').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); picker.click(); }
 });
-picker.addEventListener('change', () => accept(picker.files));
+picker.hidden = true;
+picker.id = 'picker';
+document.body.append(picker);
+picker.addEventListener('change', () => {
+  accept(picker.files);
+  // A file input only fires change when its value changes, so without this,
+  // choosing the same photo a second time does nothing at all.
+  picker.value = '';
+});
 for (const target of [$('drop'), stage]) {
   target.addEventListener('dragover', (e) => { e.preventDefault(); $('drop').classList.add('over'); });
   target.addEventListener('dragleave', () => $('drop').classList.remove('over'));
@@ -380,8 +420,11 @@ let fellBack = false;
 // overridden by config.json, which names the file the server actually wrote
 let fallbackURL = './model.onnx';
 
+let bootError = null;
+let modelReady = false;
+
 status.textContent = 'Loading model';
-fetch('./config.json')
+const booted = fetch('./config.json')
   .then((r) => (r.ok ? r.json() : { model: undefined }))
   .catch(() => ({ model: undefined }))
   .then((cfg) => {
@@ -399,7 +442,11 @@ fetch('./config.json')
     $('fill').checked = profile.fillHoles;
     $('letterbox').checked = profile.letterbox;
     readouts();
-    status.textContent = `Loading model (${Math.round(p.bytes / (1 << 20))} MB)`;
+    // a photo may already be waiting; keep saying so rather than hiding it
+    const mb = `Loading model (${Math.round(p.bytes / (1 << 20))} MB)`;
+    status.textContent = current && !current.pred
+      ? `${mb}; ${current.file.name} will start once it has loaded`
+      : mb;
     return sessionWithFallback('./model.onnx', fallbackURL, 'u2netp');
   })
   .then((result) => {
@@ -418,6 +465,7 @@ fetch('./config.json')
       readouts();
     }
 
+    modelReady = true;
     const threads = globalThis.crossOriginIsolated
       ? `${threadCount()} threads`
       : 'single thread (page is not cross-origin isolated)';
@@ -426,5 +474,10 @@ fetch('./config.json')
       : `Ready, ${threads}`;
   })
   .catch((err) => {
+    bootError = err.message;
     status.textContent = 'Model failed to load: ' + err.message;
   });
+
+// Photos picked while the model is still loading wait for it, instead of
+// each asking for a session of their own before there is one to ask for.
+queue = booted;

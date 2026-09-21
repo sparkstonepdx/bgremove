@@ -61,7 +61,9 @@
     background-size: 22px 22px; background-position: 0 0, 11px 11px;
     border-radius: 6px; overflow: hidden; }
   body.editing #stage { display: block; }
-  #stage img { display: block; width: 100%; height: 100%; }
+  /* contain, so that until the stage knows the image's aspect ratio a
+     mismatched box letterboxes the image rather than stretching it */
+  #stage img { display: block; width: 100%; height: 100%; object-fit: contain; }
   /* The original, faint, under the cutout: while a brush is selected it shows
      where the removed parts were, so there is something to paint against.
      Beneath rather than over, so the kept subject stays at full strength and
@@ -76,7 +78,15 @@
     touch-action: auto; }
   body.brushing #paint { cursor: crosshair; touch-action: none; }
   #stage { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
-  #stage.busy img { opacity: .4; }
+  /* the preview only: a rule on every stage image would also catch the
+     guide, which outranks #ghost's opacity 0 and shows it while processing */
+  /* Until the stage knows the image's aspect ratio its box is whatever the
+     preview's natural size makes it, which overflows and crops a tall photo.
+     Nothing is shown until then; it is a few milliseconds. */
+  #stage:not([data-fit]) { visibility: hidden; }
+  #stage.busy #preview { opacity: .4; }
+  /* nothing to paint against until there is a cutout */
+  #stage.busy #ghost { opacity: 0; }
 
   #drop { border: 1px dashed var(--edge); border-radius: 12px; padding: 4rem 3rem;
     text-align: center; color: var(--dim); cursor: pointer; max-width: 30rem; }

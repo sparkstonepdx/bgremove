@@ -42,6 +42,7 @@ export function useProfile(name) {
 
 // kept for callers that only want to nudge the ramp
 let session = null;
+let loading = null;
 let size = 320;
 
 // The model states its own input resolution: 320 for u2net and u2netp, 1024
@@ -59,16 +60,27 @@ export function threadCount() {
 // was a second place that named a model file, and it went stale.
 export async function getSession(model) {
   if (session) return session;
+  // Hand every caller the same in-flight load. Without this, a photo picked
+  // while the model is still downloading asked for a session of its own,
+  // with no model to load, and failed.
+  if (loading) return loading;
+  if (model === undefined) throw new Error('no model has been requested yet');
   ort.env.wasm.numThreads = threadCount();
-  session = await ort.InferenceSession.create(model, {
+  loading = ort.InferenceSession.create(model, {
     executionProviders: ['wasm'],
     graphOptimizationLevel: 'all',
+  }).then((s) => {
+    session = s;
+    const dims = s.inputMetadata?.[0]?.shape;
+    if (dims?.length === 4 && Number.isInteger(dims[3]) && dims[3] > 0) {
+      size = dims[3];
+    }
+    return s;
+  }).finally(() => {
+    // cleared on failure too, so the fallback model gets its own attempt
+    loading = null;
   });
-  const dims = session.inputMetadata?.[0]?.shape;
-  if (dims?.length === 4 && Number.isInteger(dims[3]) && dims[3] > 0) {
-    size = dims[3];
-  }
-  return session;
+  return loading;
 }
 
 // Try the configured model, and fall back to a smaller one if the browser

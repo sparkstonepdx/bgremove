@@ -7,7 +7,8 @@
     "test": "node run.mjs && node dom.mjs && node fallback.mjs && node export.mjs",
     "quality": "node quality.mjs",
     "clicks": "node clicks.mjs",
-    "check": "npm test && npm run quality"
+    "check": "pnpm test && pnpm run browser && pnpm run quality",
+    "browser": "node browser.mjs"
   },
   "keywords": [],
   "author": "",
@@ -17,5 +18,9 @@
     "linkedom": "^0.18.13"
   },
   "private": true,
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "puppeteer-core": "25.11.0",
+    "@sparticuz/chromium": "153.0.0"
+  }
 }

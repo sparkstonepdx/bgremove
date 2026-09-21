@@ -190,12 +190,21 @@ pnpm install                  # from the repo root; covers harness too
 cd harness
 pnpm test                     # pipeline, DOM workflow, fallback, static export
 pnpm run quality              # output scored against reference cutouts
-pnpm run check                # both
+pnpm run browser              # the built page in a real Chrome
+pnpm run check                # all three
 ```
 
 `pnpm test` only needs u2netp. `pnpm run quality` grades every model in
 `expected.json`, including the int8 build, so it needs the Python toolchain
 above; `BGREMOVE_MODEL=u2netp pnpm run quality` grades one model and skips it.
+
+`browser.mjs` builds the site and drives it in a real Chrome, because the Node
+tests cannot see layout or use a real file picker, and bugs in both shipped.
+It checks that a photo picked while the model is still downloading waits for it
+instead of failing, that the preview and the guide share one box on screen
+throughout processing, and that picking the same photo twice works. It uses
+`CHROME_PATH` if set, then a local Chrome, then the Chromium bundled in
+`@sparticuz/chromium`, which is Linux only and is what CI uses.
 
 Tests fetch any model they need rather than skipping. They used to print a note
 and exit 0 when a model was missing, which on a fresh CI runner means every one
