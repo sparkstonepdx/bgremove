@@ -374,14 +374,33 @@ export function toMaskCanvas(pred, opts = {}) {
   const apply = (mode, value) => {
     const picked = strokes.filter((s) => s.mode === mode);
     if (!picked.length) return;
-    const soften = mode === 'cut' ? forgive : (x) => x;
+
+    const masks = picked.map((stroke) => strokeMask([stroke], pred));
+
+    // How many red strokes cover each pixel. Forgiveness is for a slip, and
+    // painting the same place a second time is not a slip: from the second
+    // overlapping red stroke those pixels go whatever the model thinks.
+    // Without this, every pass over a spot the model is sure about was
+    // forgiven exactly like the first, so painting it again did nothing.
+    let repeated = null;
+    if (mode === 'cut' && picked.length > 1) {
+      const coverage = new Uint8Array(SIZE * SIZE);
+      for (const m of masks) for (let i = 0; i < m.length; i++) if (m[i]) coverage[i]++;
+      repeated = new Uint8Array(SIZE * SIZE);
+      for (let i = 0; i < coverage.length; i++) if (coverage[i] > 1) repeated[i] = 1;
+    }
 
     const area = new Uint8Array(SIZE * SIZE);
-    for (const stroke of picked) {
-      const painted = soften(strokeMask([stroke], pred));
+    picked.forEach((stroke, k) => {
+      const painted = mode === 'cut' ? forgive(masks[k]) : masks[k];
       const region = stroke.grow ? grow(pred, painted, stroke.grow) : painted;
       for (let i = 0; i < area.length; i++) if (region[i]) area[i] = 1;
-    }
+    });
+    // Applied as painted rather than used to seed growth. A seed that mixes
+    // confident subject into it has an average prediction partway between the
+    // two, which is the one case where growth could leak into the subject;
+    // there is no reason to run that risk for pixels that are already removed.
+    if (repeated) for (let i = 0; i < area.length; i++) if (repeated[i]) area[i] = 1;
 
     const layer = new ImageData(SIZE, SIZE);
     for (let i = 0; i < area.length; i++) if (area[i]) layer.data[i * 4 + 3] = 255;

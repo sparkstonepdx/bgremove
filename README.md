@@ -122,6 +122,12 @@ it goes. Both numbers are in `profiles.json`, as `protect` and `protectShare`;
 green over confident background is how you recover something the model
 dropped.
 
+Painting the same place a second time is not a slip, though. Pixels covered by
+two or more red strokes go whatever the model thinks, so if a spot survives
+one pass, a second pass over it removes it. Only the overlap is forced; the
+rest of each stroke is still judged as above, and strokes in different places
+never add up.
+
 Forgiveness is judged per stroke. Judging it across the whole set would let a
 careful dab somewhere else change what a sloppy one does.
 

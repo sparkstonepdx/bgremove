@@ -353,6 +353,49 @@ const pair = [
 check('one stroke does not change what another does',
   alphaAt(bg.compose(bitmap, pred, { strokes: pair, protect: 0.85 }), 0.5, 0.5) === 0);
 
+// Painting the same spot again is an instruction, not a slip. Every pass used
+// to be forgiven like the first, so a spot the model is sure about could not
+// be removed however often it was painted.
+const again = (n) => bg.compose(bitmap, pred, {
+  strokes: Array.from({ length: n }, () => ({ ...sloppy[0] })), protect: 0.85,
+});
+check('one pass over a clipped edge is still forgiven',
+  alphaAt(again(1), bite.x, bite.y) > 200, String(alphaAt(again(1), bite.x, bite.y)));
+check('a second pass over the same spot removes it',
+  alphaAt(again(2), bite.x, bite.y) === 0, String(alphaAt(again(2), bite.x, bite.y)));
+
+// ...and only what was painted twice. This checks that forced removal stays
+// inside the painted area by any route. It does not on its own show why the
+// forced pixels are kept out of growth: on this fixture colour tolerance
+// blocks spread either way, so a version that seeds from them also passes.
+{
+  const twice = [{ ...sloppy[0], grow: { tolerance: 0.15, radius: 0.25 } },
+    { ...sloppy[0], grow: { tolerance: 0.15, radius: 0.25 } }];
+  const before = bg.toMaskCanvas(pred, { protect: 0.85 }).getContext('2d')
+    .getImageData(0, 0, pred.size, pred.size).data;
+  const after = bg.toMaskCanvas(pred, { strokes: twice, protect: 0.85 }).getContext('2d')
+    .getImageData(0, 0, pred.size, pred.size).data;
+  const footprint = bg.strokeMask([sloppy[0]], pred);
+  let outside = 0;
+  let inside = 0;
+  for (let i = 0; i < footprint.length; i++) {
+    const lostSubject = before[i * 4 + 3] >= 128 && after[i * 4 + 3] < 128;
+    if (!lostSubject) continue;
+    if (footprint[i]) inside++;
+    else outside++;
+  }
+  check('forced removal takes subject only inside the painted area',
+    inside > 0 && outside === 0, `${inside} inside, ${outside} outside`);
+}
+
+// two strokes in different places do not add up to anything
+{
+  const apart = [{ ...sloppy[0] }, { mode: 'cut', size: 0.08, points: [{ x: 0.9, y: 0.1 }] }];
+  const out = bg.compose(bitmap, pred, { strokes: apart, protect: 0.85 });
+  check('strokes that do not overlap stay forgiving',
+    alphaAt(out, bite.x, bite.y) > 200, String(alphaAt(out, bite.x, bite.y)));
+}
+
 check('protectShare comes from the profile table', bg.profile.protectShare === 0.25,
   String(bg.profile.protectShare));
 
