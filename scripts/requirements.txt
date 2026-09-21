@@ -1,0 +1,6 @@
+# Pinned so the quantized model is byte-for-byte the one the quality floors
+# were measured against. The quantizer is deterministic for a given toolchain,
+# not across versions.
+onnx==1.23.0
+onnxruntime==1.24.4
+numpy==2.4.4

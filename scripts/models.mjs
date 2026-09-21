@@ -3,6 +3,7 @@
 // Every test used to have its own copy of this, and most of them exited 0
 // when the file was missing. On a fresh CI runner the cache is always empty,
 // so those tests would have passed without running anything.
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,6 +23,28 @@ export async function modelPath(name) {
   const entry = table.models[name];
   if (!entry) throw new Error(`no profile for ${name} in web/profiles.json`);
   fs.mkdirSync(cacheDir, { recursive: true });
+
+  // Built rather than downloaded: fetch the model it comes from, then run the
+  // quantizer. Deterministic for the toolchain pinned in requirements.txt, so
+  // this reproduces the exact file the quality floors were measured on.
+  if (entry.quantize) {
+    const source = await modelPath(entry.from);
+    const python = process.env.PYTHON || 'python3';
+    console.log(`quantizing ${entry.from} to ${entry.quantize} (once)`);
+    const tmp = `${file}.part`;
+    const run = spawnSync(python, [path.join(here, 'quantize.py'), source, tmp], {
+      stdio: ['ignore', 'inherit', 'inherit'],
+    });
+    if (run.error || run.status !== 0) {
+      throw new Error(
+        `quantizing ${name} failed; it needs Python with scripts/requirements.txt installed ` +
+        `(pip install -r scripts/requirements.txt)`,
+      );
+    }
+    fs.renameSync(tmp, file);
+    return file;
+  }
+
   console.log(`fetching ${name} (${Math.round(entry.bytes / (1 << 20))} MB, once)`);
   const res = await fetch(entry.url);
   if (!res.ok) throw new Error(`${entry.url}: ${res.status}`);

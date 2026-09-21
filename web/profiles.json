@@ -1,13 +1,21 @@
 {
   "_comment": "Canonical model settings. The default is isnet-general-use: 178 MB, fetched once, and the only model here that scores near a commercial cutout. native/profiles.json is a byte-identical copy; harness/parity.mjs fails if they differ. Each family was trained with its own input normalisation, so mean and std are not interchangeable: feeding isnet the ImageNet constants returns a blank mask. protect is how much of a red stroke to ignore where the model is confident it found subject, so a sloppy remove stroke does not gouge the thing you are keeping; 0 makes red literal. protectShare is how much of a stroke has to land on confident subject before it counts as aiming at it rather than slipping.",
-  "default": "isnet-general-use",
+  "default": "isnet-general-use-int8",
   "models": {
     "u2netp": {
       "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx",
       "bytes": 4574861,
       "license": "Apache-2.0",
-      "mean": [0.485, 0.456, 0.406],
-      "std": [0.229, 0.224, 0.225],
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ],
       "letterbox": false,
       "clean": {
         "lo": 0.3,
@@ -22,8 +30,16 @@
       "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx",
       "bytes": 175997641,
       "license": "Apache-2.0",
-      "mean": [0.485, 0.456, 0.406],
-      "std": [0.229, 0.224, 0.225],
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ],
       "letterbox": false,
       "clean": {
         "lo": 0.3,
@@ -38,8 +54,16 @@
       "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net_human_seg.onnx",
       "bytes": 175997641,
       "license": "Apache-2.0",
-      "mean": [0.485, 0.456, 0.406],
-      "std": [0.229, 0.224, 0.225],
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ],
       "letterbox": false,
       "clean": {
         "lo": 0.3,
@@ -54,8 +78,16 @@
       "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx",
       "bytes": 178648008,
       "license": "Apache-2.0",
-      "mean": [0.5, 0.5, 0.5],
-      "std": [1.0, 1.0, 1.0],
+      "mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "std": [
+        1.0,
+        1.0,
+        1.0
+      ],
       "letterbox": true,
       "clean": {
         "lo": 0.3,
@@ -70,8 +102,16 @@
       "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/silueta.onnx",
       "bytes": 44173029,
       "license": "Apache-2.0",
-      "mean": [0.485, 0.456, 0.406],
-      "std": [0.229, 0.224, 0.225],
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ],
       "letterbox": false,
       "clean": {
         "lo": 0.3,
@@ -81,6 +121,31 @@
       "note": "u2net architecture at a tenth the size.",
       "protect": 0.85,
       "protectShare": 0.25
+    },
+    "isnet-general-use-int8": {
+      "from": "isnet-general-use",
+      "quantize": "uint8",
+      "bytes": 46360717,
+      "license": "Apache-2.0",
+      "mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "std": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "letterbox": true,
+      "clean": {
+        "lo": 0.3,
+        "hi": 0.7
+      },
+      "fillHoles": true,
+      "protect": 0.85,
+      "protectShare": 0.25,
+      "note": "isnet with 8-bit weights, built from the full model by scripts/quantize.py. A quarter of the size and within 0.05 points of it on average across the fixtures."
     }
   }
 }

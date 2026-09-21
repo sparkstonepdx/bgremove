@@ -11,9 +11,20 @@ pnpm serve            # http://localhost:3000
 
 `pnpm build --model u2netp` picks a model; `--out dir` writes somewhere other
 than `site/`. Models are not in the repo. Whichever one you ask for is fetched
-on first use into `~/.cache/bgremove` and copied into the site. The default is
-isnet-general-use at 178 MB; u2netp is 4.5 MB and is the one GitHub Pages
-ships, for reasons under Hosting.
+on first use into `~/.cache/bgremove` and copied into the site.
+
+The default, and what GitHub Pages ships, is isnet-general-use with 8-bit
+weights: 44 MB instead of 178, and within 0.05 points of the full model on
+average across the fixtures. It is built locally from the full model rather
+than downloaded, so the first build needs Python:
+
+```
+pip install -r scripts/requirements.txt
+```
+
+The toolchain is pinned because the quantizer is deterministic for a given
+version and not across versions: pinned, it reproduces the exact file the
+quality floors were measured on, byte for byte.
 
 ## Hosting it as a static site
 
@@ -33,14 +44,15 @@ every response client-side and reloads once on first visit. On a host that
 sets the headers itself it does nothing. Without either, the page still works,
 single-threaded, and the status line says so.
 
-**Model size.** GitHub rejects files over 100 MB, so u2netp at 4.5 MB is fine
-and isnet at 178 MB cannot go in the repo. Fetching it at runtime from the
-rembg release does not work either: those assets carry no
-`Access-Control-Allow-Origin`, so the browser blocks it cross-origin. To ship
-isnet on Pages you need it on a host that sets CORS, or split across files
-under the limit and reassembled in the page.
+**Model size.** The model never goes into git: CI downloads it and puts it
+straight into the deploy artifact, where the limit is 1 GB for the whole site.
+GitHub's 100 MB file limit applies to repositories and does not come into it.
+What does is bandwidth. Pages has a soft limit of 100 GB a month, and every
+first visit downloads the model before the browser caches it. Full isnet
+works out to 564 first visits per 100 GB; the int8 build to 1843.
 
-The whole site with u2netp is about 16 MB, most of it the 12 MB runtime.
+The whole site is 60 MB: the 44 MB model, the 12 MB runtime, and u2netp at
+4.5 MB as the fallback for devices that refuse the larger one.
 
 `.github/workflows/pages.yml` does all of that on every push to `main`: frozen
 install, `pnpm test`, the quality floors for the model being shipped, then the
@@ -177,6 +189,10 @@ pnpm run quality              # output scored against reference cutouts
 pnpm run check                # both
 ```
 
+`pnpm test` only needs u2netp. `pnpm run quality` grades every model in
+`expected.json`, including the int8 build, so it needs the Python toolchain
+above; `BGREMOVE_MODEL=u2netp pnpm run quality` grades one model and skips it.
+
 Tests fetch any model they need rather than skipping. They used to print a note
 and exit 0 when a model was missing, which on a fresh CI runner means every one
 of them passes without testing anything.
@@ -190,20 +206,21 @@ alongside a 1.3 GB wasm heap, and the run dies partway through on a modest
 machine. Floors in `expected.json` are recorded at that size.
 
 Thirteen fixtures: one photo of mine, plus twelve portraits from the P3M demo
-set, which ships hand-annotated ground truth alpha under MIT. The two models
-fail differently and neither wins everywhere:
+set, which ships hand-annotated ground truth alpha under MIT.
 
-| | u2netp | isnet-general-use |
-|---|---|---|
-| best | 99.1% | 99.4% |
-| worst | 38.2% | 59.6% |
-| below 90% | 4 of 13 | 4 of 13 |
+| | mean | worst | below 90% |
+|---|---|---|---|
+| u2netp | 83.4% | 38.2% | 4 of 13 |
+| isnet-general-use | 89.5% | 59.6% | 3 of 13 |
+| isnet-general-use-int8 | 89.5% | 59.7% | 3 of 13 |
 
-u2netp collapses on three portraits by losing 16 to 22% of the subject. isnet
-recovers two of those, one going 47.4% to 96.6%, but is worse elsewhere:
-62.2% on an image where it keeps 11.3% extra background, against 94.1% for
-u2netp on the same one. Choosing a default off a single photo, which is what
-the earlier numbers here rested on, was not enough evidence.
+isnet is better on 9 of the 13, and u2netp's losses are the bad kind: it
+drops 16 to 22% of the subject on three portraits, where isnet takes one of
+them from 47.4% to 96.6%. isnet is not better everywhere, though: on one image
+it keeps 11.3% extra background and scores 62.2% against u2netp's 94.1%.
+
+The int8 build is within 0.05 points of full isnet on average, and its largest
+drop on any single fixture is 0.8.
 
 ### Scoring a click refiner
 
@@ -271,9 +288,10 @@ by `pnpm run quality`.
 
 | name | size | license | |
 |---|---|---|---|
-| `u2netp` | 4.5 MB | Apache-2.0 | what GitHub Pages ships |
+| `isnet-general-use-int8` | 44 MB | Apache-2.0 | the default and what Pages ships; built by `scripts/quantize.py` |
+| `isnet-general-use` | 178 MB | Apache-2.0 | the full model the int8 build comes from |
+| `u2netp` | 4.5 MB | Apache-2.0 | the fallback when a device refuses the default |
 | `u2net` | 176 MB | Apache-2.0 | |
-| `isnet-general-use` | 178 MB | Apache-2.0 | the default; 1024 input |
 | `silueta` | 44 MB | Apache-2.0 | |
 
 rembg's own default, `bria-rmbg`, is non-commercial only and is deliberately
