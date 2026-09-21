@@ -142,6 +142,20 @@ check('the save link is named after the file',
 check('the stage carries the image aspect ratio',
   /\d+ \/ \d+/.test($('stage').style.aspectRatio || ''), $('stage').style.aspectRatio);
 
+// the guide layer: the original, faint, beneath the cutout while painting
+const guide = () => $('ghost').getAttribute('src');
+const firstOriginal = guide();
+check('the guide layer shows the open image', !!firstOriginal, firstOriginal);
+check('the guide is the original, not the cutout', firstOriginal !== shot(),
+  `${firstOriginal} vs ${shot()}`);
+const layers = [...$('stage').children].map((n) => n.id);
+check('the guide sits beneath the cutout and the paint layer',
+  layers.indexOf('ghost') < layers.indexOf('preview') &&
+  layers.indexOf('preview') < layers.indexOf('paint'), layers.join(' < '));
+const css = [...document.querySelectorAll('style')].map((n) => n.textContent).join('\n');
+check('the guide is only shown while a brush is selected',
+  /#ghost\s*{[^}]*opacity:\s*0[;\s]/.test(css) && /body\.brushing\s+#ghost\s*{[^}]*opacity/.test(css));
+
 // the controls act on the open image
 const beforeRamp = shot();
 $('lo').value = '0.6';
@@ -171,6 +185,7 @@ pickTool('off');
 $('done').dispatchEvent(new window.Event('click'));
 await settle(300);
 check('done closes the editor', !editing());
+check('closing clears the guide', guide() === null, String(guide()));
 check('done puts the image on the rail', railItems().length === 1);
 check('the rail shows the file name',
   railItems()[0].querySelector('.label').textContent === 'first.png',
@@ -186,6 +201,8 @@ check('the rest are shown as waiting', $('queue').textContent === '1 waiting',
   $('queue').textContent);
 check('the open one is the first of the batch',
   $('save').getAttribute('download') === 'second.cutout.png', $('save').getAttribute('download'));
+check('opening a different image moves the guide to it',
+  !!guide() && guide() !== firstOriginal, `${guide()} vs ${firstOriginal}`);
 
 $('done').dispatchEvent(new window.Event('click'));
 await settle();
@@ -201,6 +218,8 @@ check('reopening files the previous one back to the rail', railItems().length ==
   String(railItems().length));
 check('the reopened image is the one clicked',
   $('save').getAttribute('download') === 'first.cutout.png', $('save').getAttribute('download'));
+check('the guide shows the reopened image, reusing its URL',
+  guide() === firstOriginal, `${guide()} vs ${firstOriginal}`);
 check('its ramp came back with it', $('loval').textContent === '0.60', $('loval').textContent);
 // undo only does anything if a stroke came back with the image
 const reopened = shot();

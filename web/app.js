@@ -9,6 +9,7 @@ import { compose, getSession, loadProfiles, predict, profile, sessionWithFallbac
 const $ = (id) => document.getElementById(id);
 const stage = $('stage');
 const preview = $('preview');
+const ghost = $('ghost');
 const paint = $('paint');
 const status = $('status');
 const picker = Object.assign(document.createElement('input'), {
@@ -127,7 +128,10 @@ function open(item) {
   current = item;
   document.body.classList.add('editing');
   adopt(item);
-  preview.src = item.url || URL.createObjectURL(item.file);
+  // one URL per image for its whole life, so reopening does not leak a new one
+  item.original ||= URL.createObjectURL(item.file);
+  ghost.src = item.original;
+  preview.src = item.url || item.original;
   status.textContent = item.pred ? `Editing ${item.file.name}` : `Removing background from ${item.file.name}`;
 
   if (item.bitmap) {
@@ -158,6 +162,7 @@ function close() {
   current = null;
   document.body.classList.remove('editing');
   preview.removeAttribute('src');
+  ghost.removeAttribute('src');
   drawStrokes();
 }
 

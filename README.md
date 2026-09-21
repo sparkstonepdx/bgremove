@@ -102,7 +102,11 @@ switch groups, but nothing about how any of it actually sizes on a device.
 
 ### Brush
 
-Green keeps, red removes. Paint on the open image to correct the model
+Green keeps, red removes. While a brush is selected the original shows
+faintly beneath the cutout, so the parts that were removed are still visible
+to paint against. It sits under the cutout rather than over it, which keeps
+the kept subject at full strength; only the transparent areas reveal it. Its
+strength is the `--ghost` custom property on the stage, 0.35 by default. Paint on the open image to correct the model
 directly: strokes are applied after the ramp and after hole filling, so they
 always win. Undo drops the last stroke.
 
