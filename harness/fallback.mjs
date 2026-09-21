@@ -6,21 +6,13 @@
 // mask, so the page drops to the model compiled into the binary.
 import { createCanvas, ImageData as NapiImageData } from '@napi-rs/canvas';
 import fs from 'node:fs';
+import { modelBytes } from './models.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-// Models live in the user cache, put there by either build on first run.
-function modelPath(name) {
-  const cached = path.join(os.homedir(), '.cache', 'bgremove', `${name}.onnx`);
-  if (!fs.existsSync(cached)) {
-    console.log(`no ${name}.onnx in ~/.cache/bgremove; run either build once to fetch it`);
-    process.exit(0);
-  }
-  return cached;
-}
 const webDir = path.join(here, '..', 'web');
 
 globalThis.OffscreenCanvas = class {
@@ -45,7 +37,7 @@ check('starts on the configured model', bg.profile.letterbox === true,
   `letterbox ${bg.profile.letterbox}`);
 
 const refused = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7]);
-const small = new Uint8Array(fs.readFileSync(modelPath('u2netp')));
+const small = await modelBytes('u2netp');
 
 // order matters: getSession caches, so once a session exists no later call
 // can reach the failure path

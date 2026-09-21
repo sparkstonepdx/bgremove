@@ -5,21 +5,13 @@
 import { parseHTML } from 'linkedom';
 import { createCanvas, ImageData as NapiImageData, loadImage } from '@napi-rs/canvas';
 import fs from 'node:fs';
+import { modelBytes } from './models.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-// Models live in the user cache, put there by either build on first run.
-function modelPath(name) {
-  const cached = path.join(os.homedir(), '.cache', 'bgremove', `${name}.onnx`);
-  if (!fs.existsSync(cached)) {
-    console.log(`no ${name}.onnx in ~/.cache/bgremove; run either build once to fetch it`);
-    process.exit(0);
-  }
-  return cached;
-}
 const webDir = path.join(here, '..', 'web');
 
 // ---------------------------------------------------------------- shims
@@ -93,7 +85,7 @@ Object.defineProperty(ElementProto, 'clientWidth', { get() { return 600; }, conf
 Object.defineProperty(ElementProto, 'clientHeight', { get() { return 800; }, configurable: true });
 
 const bg = await import(path.join(webDir, 'bg.js'));
-const model = new Uint8Array(fs.readFileSync(modelPath('u2netp')));
+const model = await modelBytes('u2netp');
 // pinned to the embedded model, not the table default
 await bg.loadProfiles(JSON.parse(fs.readFileSync(path.join(webDir, 'profiles.json'), 'utf8')), 'u2netp');
 await bg.getSession(model);

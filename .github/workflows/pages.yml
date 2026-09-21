@@ -1,0 +1,84 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and let a running one finish rather than cutting
+# it off halfway through publishing.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  # The model that ships. isnet scores better but is 178 MB, over GitHub's
+  # 100 MB file limit, and its release assets carry no CORS header, so a
+  # Pages site can neither host it nor fetch it at runtime.
+  MODEL: u2netp
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      # Frozen, so a lockfile that has drifted from package.json fails here
+      # rather than quietly resolving something different in CI.
+      - run: pnpm install --frozen-lockfile
+
+      # The runtime is embedded out of node_modules, so this has to come after
+      # the install. It needs real directories there, not symlinks, which is
+      # why pnpm-workspace.yaml sets nodeLinker: hoisted.
+      - run: go build -o bgremove .
+        env:
+          CGO_ENABLED: '0'
+
+      - name: Test
+        working-directory: harness
+        run: pnpm test
+
+      # Only the model being deployed. Scoring isnet would mean fetching
+      # 178 MB to grade something that is not going out.
+      - name: Quality floors for the shipped model
+        working-directory: harness
+        run: pnpm run quality
+        env:
+          BGREMOVE_MODEL: ${{ env.MODEL }}
+
+      - name: Export the static site
+        run: ./bgremove -model "$MODEL" -dir site
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -14,6 +14,7 @@
 // record of why.
 import { createCanvas, ImageData as NapiImageData, loadImage } from '@napi-rs/canvas';
 import fs from 'node:fs';
+import { modelBytes } from './models.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,23 +57,6 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'pass' : 'FAIL'}  ${name}${detail ? '  ' + detail : ''}`);
   if (!ok) failures++;
 };
-
-// Fetch a model rather than skipping when it is absent. A skipped quality
-// check is how a broken model stays broken.
-async function modelBytes(name) {
-  const dir = path.join(os.homedir(), '.cache', 'bgremove');
-  const file = path.join(dir, `${name}.onnx`);
-  if (!fs.existsSync(file)) {
-    const url = table.models[name]?.url;
-    if (!url) throw new Error(`no url for ${name}`);
-    fs.mkdirSync(dir, { recursive: true });
-    console.log(`fetching ${name} (${Math.round(table.models[name].bytes / (1 << 20))} MB, once)`);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`${url}: ${res.status}`);
-    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
-  }
-  return new Uint8Array(fs.readFileSync(file));
-}
 
 async function alphaOf(source, w, h) {
   const img = await loadImage(source);

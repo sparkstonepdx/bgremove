@@ -1,22 +1,23 @@
-# bgremove (WASM)
+# bgremove
 
-Background removal that runs in the browser tab. The page, the ONNX Runtime
-WASM build and the u2netp model are compiled into the binary, so there is no
-cgo, no shared library to install, and nothing fetched at runtime.
+Background removal that runs in the browser tab. No image leaves the machine.
 
 ```
-CGO_ENABLED=0 go build -o bgremove .           # cross-compiles anywhere Go does
+pnpm install                                   # the runtime the page loads
+CGO_ENABLED=0 go build -o bgremove .
 ./bgremove                                     # http://127.0.0.1:7734
-./bgremove -model isnet-general-use             # full quality, fetches 176 MB once
-./bgremove -dir site/                          # dump a standalone static site
+./bgremove -model u2netp -dir site/            # a static site, see below
 ```
 
-The default is isnet-general-use, fetched once into `~/.cache/bgremove` and
-served from there. u2netp stays compiled in, so `-model u2netp` starts
-instantly and works with no network at all, at a real cost in quality: 77.5%
-mask IoU against 92.7% on the test fixture.
+`pnpm install` has to come first: the binary embeds the ONNX Runtime and the
+isolation service worker straight out of `node_modules`, so `go build` fails
+without them. `pnpm-workspace.yaml` sets `nodeLinker: hoisted` for the same
+reason. pnpm's default layout is a tree of symlinks, and `go:embed` will not
+follow a symlink.
 
-23 MB binary: 12 MB runtime, 4.5 MB model, the rest Go.
+Models are not in the repo. Whichever one you ask for is fetched on first use
+into `~/.cache/bgremove`. The default is isnet-general-use at 178 MB; u2netp
+is 4.5 MB and is the one the static site ships, for reasons under Hosting.
 
 ## Hosting it as a static site
 
@@ -45,6 +46,11 @@ isnet on Pages you need it on a host that sets CORS, or split across files
 under the limit and reassembled in the page.
 
 The whole site with u2netp is about 16 MB, most of it the 12 MB runtime.
+
+`.github/workflows/pages.yml` does all of that on every push to `main`: frozen
+install, build, `pnpm test`, the quality floors for the model being shipped,
+then the export and the deploy. A failing test stops the deploy. It needs one
+setting changed by hand, once: Settings, Pages, Source, set to GitHub Actions.
 
 ## Why the server exists at all
 
@@ -86,8 +92,8 @@ first version of this page.
 
 The bigger problem is the model. isnet is 178 MB and runs at 1024x1024, and a
 phone can refuse it on memory alone. If the configured model fails to load,
-the page falls back to the u2netp compiled into the binary, adopts that
-profile's defaults, and says so in the status line rather than leaving a dead
+the page falls back to u2netp, which the server always has on hand for exactly
+this and which `config.json` names, adopts that profile's defaults, and says so in the status line rather than leaving a dead
 page. `-model u2netp` avoids the question entirely at a real cost in quality.
 
 None of the layout above has been tested. linkedom has no layout engine, so
@@ -176,11 +182,16 @@ the `ort` module. That is the whole reason it can be tested in Node.
 ## Tests
 
 ```
-cd harness && npm install
-npm test         # pipeline, DOM workflow, model fallback
-npm run quality  # output scored against reference cutouts
-npm run check    # both
+pnpm install                  # from the repo root; covers harness too
+cd harness
+pnpm test                     # pipeline, DOM workflow, fallback, static export
+pnpm run quality              # output scored against reference cutouts
+pnpm run check                # both
 ```
+
+Tests fetch any model they need rather than skipping. They used to print a note
+and exit 0 when a model was missing, which on a fresh CI runner means every one
+of them passes without testing anything.
 
 `quality.mjs` runs each model in its own process, because `bg.js` keeps one
 session the way a page does. It fetches any model it does not find in
@@ -208,7 +219,7 @@ the earlier numbers here rested on, was not enough evidence.
 
 ### Scoring a click refiner
 
-`npm run clicks` measures how well corrective clicks actually fix a mask. It
+`pnpm run clicks` measures how well corrective clicks actually fix a mask. It
 is the standard interactive-segmentation evaluation: clicks are placed
 automatically, each at the centre of the largest region where the current mask
 disagrees with the reference, positive where subject is missing and negative
@@ -268,7 +279,7 @@ Add an entry to `profiles.json` and start with `-model <name>`. The input
 resolution comes from the model's own metadata, so nothing in the code
 changes. Every model is fetched on first use into `~/.cache/bgremove`; none
 are vendored. Add a floor for it in `harness/expected.json` so it is covered
-by `npm run quality`.
+by `pnpm run quality`.
 
 | name | size | license | |
 |---|---|---|---|

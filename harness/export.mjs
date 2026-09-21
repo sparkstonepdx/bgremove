@@ -22,8 +22,10 @@ const check = (name, ok, detail = '') => {
 };
 
 if (!fs.existsSync(binary)) {
-  console.log('skip  export: build the binary first (npm install && go build -o bgremove .)');
-  process.exit(0);
+  // Not a skip: in CI a missing binary means the build step broke, and a test
+  // that passes because there was nothing to test is worse than no test.
+  check('the binary exists to export with', false, 'run pnpm install && go build -o bgremove . first');
+  process.exit(1);
 }
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bgexport-'));
