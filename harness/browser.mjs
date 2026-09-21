@@ -143,7 +143,8 @@ async function pick(page, name) {
   check('with the brush off the guide stays hidden', (await opacity()) === 0, String(await opacity()));
   await page.evaluate(() => document.querySelector('input[name=tool][value=cut]').closest('label').click());
   await new Promise((r) => setTimeout(r, 300));
-  check('with a brush selected the guide shows', (await opacity()) > 0.2, String(await opacity()));
+  check('with a brush selected the guide shows, faintly',
+    (await opacity()) > 0.1 && (await opacity()) < 0.3, String(await opacity()));
   await page.close();
   server.close();
 }
